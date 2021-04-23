@@ -39,9 +39,9 @@ impl RType {
             funct3 as u8,
             funct7 as u8,
             RType {
-                rd: rd as u8,
-                rs1: rs1 as u8,
-                rs2: rs2 as u8,
+                rd: (rd as u8).into(),
+                rs1: (rs1 as u8).into(),
+                rs2: (rs2 as u8).into(),
             },
         )
     }
@@ -62,8 +62,8 @@ impl IType {
             funct3 as u8,
             IType {
                 val: imm,
-                rd: rd as u8,
-                rs: rs as u8,
+                rd: (rd as u8).into(),
+                rs: (rs as u8).into(),
             },
         )
     }
@@ -86,8 +86,8 @@ impl SType {
             funct3 as u8,
             SType {
                 val: imm_high | imm_low,
-                rs1: rs1 as u8,
-                rs2: rs2 as u8,
+                rs1: (rs1 as u8).into(),
+                rs2: (rs2 as u8).into(),
             },
         )
     }
@@ -116,8 +116,8 @@ impl BType {
             funct3 as u8,
             BType {
                 val: imm,
-                rs1: rs1 as u8,
-                rs2: rs2 as u8,
+                rs1: (rs1 as u8).into(),
+                rs2: (rs2 as u8).into(),
             },
         )
     }
@@ -134,7 +134,7 @@ impl UType {
 
         UType {
             val: imm,
-            rd: rd as u8,
+            rd: (rd as u8).into(),
         }
     }
 }
@@ -157,7 +157,7 @@ impl JType {
 
         JType {
             val: imm,
-            rd: rd as u8,
+            rd: (rd as u8).into(),
         }
     }
 }

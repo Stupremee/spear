@@ -1,6 +1,6 @@
 //! Implementation of the RV32I base extension.
 
-use derive_more::Display;
+use derive_more::{Display, From, Into};
 use std::fmt;
 
 mod parse;
@@ -8,6 +8,52 @@ pub use parse::parse;
 
 /// The RV32I base extension.
 pub struct Extension {}
+
+/// Type safe access for a X register.
+/// This type does not guarantee anything abuot the validity about the value inside.
+#[repr(transparent)]
+#[derive(Debug, From, Into)]
+pub struct Register(u8);
+
+impl fmt::Display for Register {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            0 => write!(f, "zero"),
+            1 => write!(f, "ra"),
+            2 => write!(f, "sp"),
+            3 => write!(f, "gp"),
+            4 => write!(f, "tp"),
+            5 => write!(f, "t0"),
+            6 => write!(f, "t1"),
+            7 => write!(f, "t2"),
+            8 => write!(f, "s0"),
+            9 => write!(f, "s1"),
+            10 => write!(f, "a0"),
+            11 => write!(f, "a1"),
+            12 => write!(f, "a2"),
+            13 => write!(f, "a3"),
+            14 => write!(f, "a4"),
+            15 => write!(f, "a5"),
+            16 => write!(f, "a6"),
+            17 => write!(f, "a7"),
+            18 => write!(f, "s2"),
+            19 => write!(f, "s3"),
+            20 => write!(f, "s4"),
+            21 => write!(f, "s5"),
+            22 => write!(f, "s6"),
+            23 => write!(f, "s7"),
+            24 => write!(f, "s8"),
+            25 => write!(f, "s9"),
+            26 => write!(f, "s10"),
+            27 => write!(f, "s11"),
+            28 => write!(f, "t3"),
+            29 => write!(f, "t4"),
+            30 => write!(f, "t5"),
+            31 => write!(f, "t6"),
+            _ => write!(f, "x{}", self.0),
+        }
+    }
+}
 
 /// Enum for representing the different instruction formats.
 #[derive(Debug)]
@@ -27,15 +73,20 @@ pub enum InstructionType {
 }
 
 /// The R instruction format.
-#[derive(Debug, Display)]
-#[display(fmt = "x{}, x{}, x{}", rd, rs1, rs2)]
+#[derive(Debug)]
 pub struct RType {
     /// The destination register index.
-    pub rd: u8,
+    pub rd: Register,
     /// The first source register index.
-    pub rs1: u8,
+    pub rs1: Register,
     /// The seconf source register index.
-    pub rs2: u8,
+    pub rs2: Register,
+}
+
+impl fmt::Display for RType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}, {}, {}", self.rd, self.rs1, self.rs2)
+    }
 }
 
 /// The I instruction format.
@@ -44,9 +95,9 @@ pub struct IType {
     /// The immediate value as the raw byte value, that is not yet sign-extended.
     pub val: u32,
     /// The destination register index.
-    pub rd: u8,
+    pub rd: Register,
     /// The source register index.
-    pub rs: u8,
+    pub rs: Register,
 }
 
 impl IType {
@@ -61,7 +112,7 @@ impl IType {
 impl fmt::Display for IType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let imm = self.sign_val();
-        write!(f, "x{}, x{}, {}", self.rd, self.rs, imm)
+        write!(f, "{}, {}, {}", self.rd, self.rs, imm)
     }
 }
 
@@ -71,9 +122,9 @@ pub struct SType {
     /// The immediate value as the raw byte value, that is not yet sign-extended.
     pub val: u32,
     /// The source 1 register index.
-    pub rs1: u8,
+    pub rs1: Register,
     /// The source 2 register index.
-    pub rs2: u8,
+    pub rs2: Register,
 }
 
 impl SType {
@@ -88,7 +139,7 @@ impl SType {
 impl fmt::Display for SType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let imm = self.sign_val();
-        write!(f, "x{}, {}(x{})", self.rs2, imm, self.rs1)
+        write!(f, "{}, {}({})", self.rs2, imm, self.rs1)
     }
 }
 
@@ -98,9 +149,9 @@ pub struct BType {
     /// The immediate value as the raw byte value, that is not yet sign-extended.
     pub val: u32,
     /// The source 1 register index.
-    pub rs1: u8,
+    pub rs1: Register,
     /// The source 2 register index.
-    pub rs2: u8,
+    pub rs2: Register,
 }
 
 impl BType {
@@ -115,7 +166,7 @@ impl BType {
 impl fmt::Display for BType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let imm = self.sign_val();
-        write!(f, "{}, x{}, x{}", imm, self.rs1, self.rs2,)
+        write!(f, "{}, {}, {}", imm, self.rs1, self.rs2,)
     }
 }
 
@@ -139,7 +190,7 @@ impl UType {
 impl fmt::Display for UType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let imm = self.sign_val();
-        write!(f, "x{}, {}", self.rd, imm,)
+        write!(f, "{}, {}", self.rd, imm,)
     }
 }
 
@@ -149,7 +200,7 @@ pub struct JType {
     /// The immediate value as the raw byte value, that is not yet sign-extended.
     pub val: u32,
     /// The destination register index.
-    pub rd: u8,
+    pub rd: Register,
 }
 
 impl JType {
@@ -164,7 +215,7 @@ impl JType {
 impl fmt::Display for JType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let imm = self.sign_val();
-        write!(f, "x{}, {}", self.rd, imm,)
+        write!(f, "{}, {}", self.rd, imm,)
     }
 }
 

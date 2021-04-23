@@ -14,8 +14,8 @@ macro_rules! test_instructions {
 
 test_instructions! {
     test_add_inst {
-        0xFF010113: "addi x2, x2, -16",
-        0x01010413: "addi x8, x2, 16",
-        0x01010113: "addi x2, x2, 16",
+        0xFF010113: "addi sp, sp, -16",
+        0x01010413: "addi s0, sp, 16",
+        0x01010113: "addi sp, sp, 16",
     }
 }

@@ -11,7 +11,7 @@ bytemuck = "1.5"
 [dependencies.derive_more]
 version = "0.99"
 default-features = false
-features = ["display"]
+features = ["display", "from", "into"]
 
 [package.metadata.nix]
 # Toggle app flake output
