@@ -7,7 +7,7 @@ impl InstructionType {
     pub fn from_opcode(opcode: u8) -> Option<Self> {
         match opcode {
             // R-variant
-            0b011_0011 | 0b011_1011 => Some(Self::R),
+            0b011_0011 => Some(Self::R),
             // I-variant
             0b000_0011 | 0b000_1111 | 0b001_0011 | 0b110_0111 | 0b111_0011 => Some(Self::I),
             // S-variant
@@ -162,39 +162,127 @@ impl JType {
     }
 }
 
-fn get_r_type(_ty: RType, _funct3: u8, _funct7: u8) -> Option<Instruction> {
-    None
+fn get_r_type(ty: RType, funct3: u8, funct7: u8) -> Option<Instruction> {
+    let inst = match (funct3, funct7) {
+        (0b000, 0b0000000) => Instruction::ADD(ty),
+        (0b000, 0b0100000) => Instruction::SUB(ty),
+        (0b001, 0b0000000) => Instruction::SLL(ty),
+        (0b010, 0b0000000) => Instruction::SLT(ty),
+        (0b011, 0b0000000) => Instruction::SLTU(ty),
+        (0b100, 0b0000000) => Instruction::XOR(ty),
+        (0b101, 0b0000000) => Instruction::SRL(ty),
+        (0b101, 0b0100000) => Instruction::SRA(ty),
+        (0b110, 0b0100000) => Instruction::OR(ty),
+        (0b111, 0b0100000) => Instruction::AND(ty),
+        _ => return None,
+    };
+    Some(inst)
+}
+
+fn get_i_type(ty: IType, opcode: u8, funct3: u8) -> Option<Instruction> {
+    let inst = match (opcode, funct3) {
+        (0b000_0011, 0b000) => Instruction::LB(ty),
+        (0b000_0011, 0b001) => Instruction::LH(ty),
+        (0b000_0011, 0b010) => Instruction::LW(ty),
+        (0b000_0011, 0b100) => Instruction::LBU(ty),
+        (0b000_0011, 0b101) => Instruction::LHU(ty),
+
+        (0b000_1111, 0b000) => Instruction::FENCE(ty),
+
+        (0b001_0011, 0b000) => Instruction::ADDI(ty),
+        (0b001_0011, 0b010) => Instruction::SLTI(ty),
+        (0b001_0011, 0b011) => Instruction::SLTIU(ty),
+        (0b001_0011, 0b100) => Instruction::XORI(ty),
+        (0b001_0011, 0b110) => Instruction::ORI(ty),
+        (0b001_0011, 0b111) => Instruction::ANDI(ty),
+        (0b001_0011, 0b001) => Instruction::SLLI(ty),
+        (0b001_0011, 0b101) => match ty.val & (1 << 31) != 0 {
+            false => Instruction::SRLI(ty),
+            true => Instruction::SRAI(ty),
+        },
+
+        (0b110_0111, 0b000) => Instruction::JALR(ty),
+
+        (0b111_0011, 0b000) if ty.val == 0 => Instruction::ECALL(ty),
+        (0b111_0011, 0b000) if ty.val != 0 => Instruction::EBREAK(ty),
+        _ => return None,
+    };
+    Some(inst)
+}
+
+fn get_s_type(ty: SType, funct3: u8) -> Option<Instruction> {
+    let inst = match funct3 {
+        0b000 => Instruction::SB(ty),
+        0b001 => Instruction::SH(ty),
+        0b010 => Instruction::SW(ty),
+        _ => return None,
+    };
+    Some(inst)
+}
+
+fn get_b_type(ty: BType, funct3: u8) -> Option<Instruction> {
+    let inst = match funct3 {
+        0b000 => Instruction::BEQ(ty),
+        0b001 => Instruction::BNE(ty),
+        0b100 => Instruction::BLT(ty),
+        0b101 => Instruction::BGE(ty),
+        0b110 => Instruction::BLTU(ty),
+        0b111 => Instruction::BGEU(ty),
+        _ => return None,
+    };
+    Some(inst)
+}
+
+fn get_u_type(ty: UType, opcode: u8) -> Option<Instruction> {
+    let inst = match opcode {
+        0b011_0111 => Instruction::LUI(ty),
+        0b001_0111 => Instruction::AUIPC(ty),
+        _ => return None,
+    };
+    Some(inst)
+}
+
+fn get_j_type(ty: JType, opcode: u8) -> Option<Instruction> {
+    let inst = match opcode {
+        0b110_1111 => Instruction::JAL(ty),
+        _ => return None,
+    };
+    Some(inst)
 }
 
 /// Top level function for parsing a RV32I instruction.
 pub fn parse(inst: u32) -> Option<Instruction> {
     // get the opcode from the first 6 bits
-    let opcode = inst & 0x3FF;
-    match InstructionType::from_opcode(opcode as u8)? {
+    let opcode = (inst & 0x3FF) as u8;
+    match InstructionType::from_opcode(opcode)? {
         InstructionType::R => {
-            let _ty = RType::parse(inst);
+            let (funct3, funct7, ty) = RType::parse(inst);
+            get_r_type(ty, funct3, funct7)
         }
         // I-variant
         InstructionType::I => {
-            let _ty = IType::parse(inst);
+            let (funct3, ty) = IType::parse(inst);
+            get_i_type(ty, opcode, funct3)
         }
         // S-variant
         InstructionType::S => {
-            let _ty = SType::parse(inst);
+            let (funct3, ty) = SType::parse(inst);
+            get_s_type(ty, funct3)
         }
         // B-variant
         InstructionType::B => {
-            let _ty = BType::parse(inst);
+            let (funct3, ty) = BType::parse(inst);
+            get_b_type(ty, funct3)
         }
         // U-variant
         InstructionType::U => {
-            let _ty = UType::parse(inst);
+            let ty = UType::parse(inst);
+            get_u_type(ty, opcode)
         }
         // J-variant
         InstructionType::J => {
-            let _ty = JType::parse(inst);
+            let ty = JType::parse(inst);
+            get_j_type(ty, opcode)
         }
     }
-
-    None
 }

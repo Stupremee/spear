@@ -107,6 +107,7 @@ pub enum Instruction {
 
     ADDI(IType),
     SLTI(IType),
+    SLTIU(IType),
     XORI(IType),
     ORI(IType),
     ANDI(IType),
