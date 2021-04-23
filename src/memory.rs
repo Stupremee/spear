@@ -5,7 +5,9 @@
 
 use super::Address;
 use bytemuck::{bytes_of, bytes_of_mut, Pod};
+use object::{File, Object, ObjectSection};
 use std::collections::BTreeMap;
+use std::mem::align_of;
 
 /// Anything that can be used to access memory, including RAM and MMIO devices.
 ///
@@ -49,6 +51,24 @@ impl Memory {
         Self::default()
     }
 
+    /// Load an object file that was previously parsed by the [`object`] crate.
+    ///
+    /// This method will create multiple RAM devices into this memory bus.
+    pub fn load_object(&mut self, obj: File<'_>) -> object::Result<()> {
+        assert!(obj.is_little_endian(), "Big Endian not supported");
+
+        // go through each section that is not at address zero and has no zero size
+        for section in obj
+            .sections()
+            .filter(|sec| sec.size() != 0 && sec.address() != 64)
+        {
+            let dev = RamDevice::from_vec(section.data()?.to_vec());
+            self.add_device(section.address().into(), dev);
+        }
+
+        Ok(())
+    }
+
     /// Add a new device to this memory bus, that starts at the `base` address.
     pub fn add_device(&mut self, base: Address, dev: impl MemoryDevice + 'static) {
         // TODO: check overlap of addresses here
@@ -61,6 +81,11 @@ impl Memory {
     ///
     /// `None` if the read failed.
     pub fn read<T: Pod>(&self, addr: Address) -> Option<T> {
+        // check alignment of the address
+        if u64::from(addr) & (align_of::<T>() as u64 - 1) != 0 {
+            return None;
+        }
+
         // find the device that has the smallest, positive distance
         // from the requested address
         let (&offset, device) = self.devices.iter().find(|(&k, v)| {
@@ -85,6 +110,11 @@ impl Memory {
     /// `None` if the read failed, which may be caused by unaligned address,
     /// no physical memory for `addr` and others.
     pub fn write<T: Pod>(&mut self, addr: Address, item: T) -> Option<()> {
+        // check alignment of the address
+        if u64::from(addr) & (align_of::<T>() as u64 - 1) != 0 {
+            return None;
+        }
+
         // find the first device that contains the given address
         let (&offset, device) = self.devices.iter_mut().find(|(&k, v)| {
             let base = u64::from(k);
@@ -109,6 +139,13 @@ impl RamDevice {
     pub fn new(size: usize) -> Self {
         Self {
             ram: vec![0u8; size].into_boxed_slice(),
+        }
+    }
+
+    /// Create a RAM device that is initialized using the given vec.
+    pub fn from_vec(vec: Vec<u8>) -> Self {
+        Self {
+            ram: vec.into_boxed_slice(),
         }
     }
 }

@@ -15,7 +15,7 @@ pub trait Instruction {
     type Ext: Extension;
 
     /// Execute this instruction on the given CPU, with the context of the associated extension.
-    fn exec(self, ext: &mut Self::Ext, cpu: &mut cpu::Cpu);
+    fn exec(self, ext: &mut Self::Ext);
 }
 
 /// A trait that represents a RISC-V ISA extension.
@@ -29,16 +29,22 @@ pub trait Extension {
     fn parse_instruction(&self, _: u32) -> Option<Self::Inst>;
 }
 
-/// Represents a RISC-V base extension.
-///
-/// The difference to a normal [`Extension`] is, that there can only be one active base
-/// extension but multiple normal extension.
-#[allow(clippy::upper_case_acronyms)]
-pub enum BaseExtension {
-    /// The RV32I base extension.
-    RV32I(extensions::rv32i::Extension),
-}
-
 /// An architecture is a collection of RISC-V extensions that are enabled and will
 /// be used to run the emulator.
-pub struct Architecture {}
+pub struct Architecture {
+    pub(crate) base: extensions::rv32i::Extension,
+}
+
+impl Architecture {
+    /// Create an architecture that uses the RV32I extension.
+    pub fn rv32i() -> Self {
+        Self {
+            base: Default::default(),
+        }
+    }
+
+    /// Return a mutable reference to the base extension.
+    pub fn base(&mut self) -> &mut extensions::rv32i::Extension {
+        &mut self.base
+    }
+}

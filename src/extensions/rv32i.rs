@@ -1,18 +1,64 @@
 //! Implementation of the RV32I base extension.
 
+use crate::Address;
 use derive_more::{Display, From, Into};
 use std::fmt;
+
+mod exec;
+pub use exec::exec;
 
 mod parse;
 pub use parse::parse;
 
 /// The RV32I base extension.
-pub struct Extension {}
+#[derive(Debug, Default)]
+pub struct Extension {
+    registers: [Address; 31],
+}
+
+impl Extension {
+    /// Create a new RV32I extension.
+    pub fn new() -> Self {
+        Self {
+            registers: [0.into(); 31],
+        }
+    }
+
+    /// Read the given register out of this extension.
+    pub fn read_register(&self, reg: Register) -> Address {
+        if reg.0 == 0 {
+            0.into()
+        } else {
+            *self
+                .registers
+                .get(reg.0 as usize - 1)
+                .expect("tried to access invalid register")
+        }
+    }
+
+    /// Write the given value into `reg`.
+    pub fn write_register(&mut self, reg: Register, x: Address) {
+        if reg.0 != 0 {
+            *self
+                .registers
+                .get_mut(reg.0 as usize - 1)
+                .expect("tried to access invalid register") = x;
+        }
+    }
+}
+
+impl crate::Extension for Extension {
+    type Inst = Instruction;
+
+    fn parse_instruction(&self, x: u32) -> Option<Self::Inst> {
+        parse(x)
+    }
+}
 
 /// Type safe access for a X register.
 /// This type does not guarantee anything abuot the validity about the value inside.
 #[repr(transparent)]
-#[derive(Debug, From, Into)]
+#[derive(Debug, From, Into, Clone, Copy)]
 pub struct Register(u8);
 
 impl fmt::Display for Register {
@@ -311,4 +357,12 @@ pub enum Instruction {
     ECALL(IType),
     #[display(fmt = "ebreak")]
     EBREAK(IType),
+}
+
+impl crate::Instruction for Instruction {
+    type Ext = Extension;
+
+    fn exec(self, ext: &mut Self::Ext) {
+        exec(ext, self)
+    }
 }

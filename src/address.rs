@@ -5,7 +5,7 @@ use std::ops;
 /// This type also provides abstractions for converting between 32 and 64 (and soon 128)
 /// bit addresses.
 #[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Address(u64);
 
 impl From<u64> for Address {
