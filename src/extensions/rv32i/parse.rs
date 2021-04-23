@@ -130,7 +130,7 @@ impl UType {
     /// The parsed [`UType`].
     pub fn parse(inst: u32) -> Self {
         let rd = (inst >> 7) & 0x1F;
-        let imm = inst & 0xFFFF_F000;
+        let imm = (inst >> 12) << 12;
 
         UType {
             val: imm,
@@ -179,7 +179,7 @@ fn get_r_type(ty: RType, funct3: u8, funct7: u8) -> Option<Instruction> {
     Some(inst)
 }
 
-fn get_i_type(ty: IType, opcode: u8, funct3: u8) -> Option<Instruction> {
+fn get_i_type(mut ty: IType, opcode: u8, funct3: u8) -> Option<Instruction> {
     let inst = match (opcode, funct3) {
         (0b000_0011, 0b000) => Instruction::LB(ty),
         (0b000_0011, 0b001) => Instruction::LH(ty),
@@ -196,9 +196,12 @@ fn get_i_type(ty: IType, opcode: u8, funct3: u8) -> Option<Instruction> {
         (0b001_0011, 0b110) => Instruction::ORI(ty),
         (0b001_0011, 0b111) => Instruction::ANDI(ty),
         (0b001_0011, 0b001) => Instruction::SLLI(ty),
-        (0b001_0011, 0b101) => match ty.val & (1 << 31) != 0 {
-            false => Instruction::SRLI(ty),
-            true => Instruction::SRAI(ty),
+        (0b001_0011, 0b101) => match ty.val & (1 << 10) == 0 {
+            true => Instruction::SRLI(ty),
+            false => {
+                ty.val &= !(1 << 10);
+                Instruction::SRAI(ty)
+            }
         },
 
         (0b110_0111, 0b000) => Instruction::JALR(ty),

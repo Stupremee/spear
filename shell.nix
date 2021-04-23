@@ -7,15 +7,18 @@ let
     crossSystem = (import <nixpkgs/lib>).systems.examples.riscv32-embedded;
   };
 
+  spike = pkgs.callPackage ./nix/spike.nix { };
 in pkgsRiscv.mkShell {
   name = "rust-shell";
   nativeBuildInputs = with pkgs; [
     rust
     rustfmt
 
+    llvm_11
     python3
     dtc
     cargo-expand
     cargo-watch
+    spike
   ];
 }

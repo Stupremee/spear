@@ -166,7 +166,7 @@ impl BType {
 impl fmt::Display for BType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let imm = self.sign_val();
-        write!(f, "{}, {}, {}", imm, self.rs1, self.rs2,)
+        write!(f, "{}, {}, {}", self.rs1, self.rs2, imm)
     }
 }
 
@@ -176,7 +176,7 @@ pub struct UType {
     /// The immediate value as the raw byte value, that is not yet sign-extended.
     pub val: u32,
     /// The destination register index.
-    pub rd: u8,
+    pub rd: Register,
 }
 
 impl UType {
@@ -190,7 +190,7 @@ impl UType {
 impl fmt::Display for UType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let imm = self.sign_val();
-        write!(f, "{}, {}", self.rd, imm,)
+        write!(f, "{}, {}", self.rd, imm >> 12)
     }
 }
 
@@ -305,10 +305,10 @@ pub enum Instruction {
     #[display(fmt = "and {}", "_0")]
     AND(RType),
 
-    #[display(fmt = "fence {}", "_0")]
+    #[display(fmt = "fence")]
     FENCE(IType),
-    #[display(fmt = "ecall {}", "_0")]
+    #[display(fmt = "ecall")]
     ECALL(IType),
-    #[display(fmt = "ebreak {}", "_0")]
+    #[display(fmt = "ebreak")]
     EBREAK(IType),
 }
