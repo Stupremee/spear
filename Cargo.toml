@@ -7,12 +7,11 @@ edition = "2018"
 
 [dependencies]
 bytemuck = "1.5"
-tracing = "0.1"
 
-[dependencies.tracing-subscriber]
-version = "0.2"
+[dependencies.derive_more]
+version = "0.99"
 default-features = false
-features = ["fmt", "ansi"]
+features = ["display"]
 
 [package.metadata.nix]
 # Toggle app flake output

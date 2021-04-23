@@ -41,6 +41,4 @@ pub enum BaseExtension {
 
 /// An architecture is a collection of RISC-V extensions that are enabled and will
 /// be used to run the emulator.
-pub struct Architecture {
-    base: BaseExtension,
-}
+pub struct Architecture {}

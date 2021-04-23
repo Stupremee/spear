@@ -253,7 +253,7 @@ fn get_j_type(ty: JType, opcode: u8) -> Option<Instruction> {
 /// Top level function for parsing a RV32I instruction.
 pub fn parse(inst: u32) -> Option<Instruction> {
     // get the opcode from the first 6 bits
-    let opcode = (inst & 0x3FF) as u8;
+    let opcode = (inst & 0x7F) as u8;
     match InstructionType::from_opcode(opcode)? {
         InstructionType::R => {
             let (funct3, funct7, ty) = RType::parse(inst);
