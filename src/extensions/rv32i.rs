@@ -14,6 +14,7 @@ pub use parse::parse;
 #[derive(Debug)]
 pub struct Extension {
     registers: [Address; 32],
+    pc: Address,
 }
 
 impl Extension {
@@ -21,6 +22,7 @@ impl Extension {
     pub fn new_32bit() -> Self {
         Self {
             registers: [0u32.into(); 32],
+            pc: Address::from(0u32),
         }
     }
 
@@ -44,6 +46,16 @@ impl Extension {
                 .get_mut(reg.0 as usize - 1)
                 .expect("tried to access invalid register") = x;
         }
+    }
+
+    /// Get the current program counter.
+    pub fn get_pc(&self) -> Address {
+        self.pc
+    }
+
+    /// Set the program counter.
+    pub fn set_pc(&mut self, pc: Address) {
+        self.pc = pc;
     }
 }
 
@@ -149,7 +161,7 @@ pub struct IType {
 impl IType {
     /// Sign extend the raw immediate value of this I-type.
     #[inline]
-    pub fn sign_val(&self) -> i32 {
+    pub fn sign_imm(&self) -> i32 {
         let val = self.val as i32;
         (val << 20) >> 20
     }
@@ -157,7 +169,7 @@ impl IType {
 
 impl fmt::Display for IType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let imm = self.sign_val();
+        let imm = self.sign_imm();
         write!(f, "{}, {}, {}", self.rd, self.rs, imm)
     }
 }
@@ -176,7 +188,7 @@ pub struct SType {
 impl SType {
     /// Sign extend the raw immediate value of this S-type.
     #[inline]
-    pub fn sign_val(&self) -> i32 {
+    pub fn sign_imm(&self) -> i32 {
         let val = self.val as i32;
         (val << 20) >> 20
     }
@@ -184,7 +196,7 @@ impl SType {
 
 impl fmt::Display for SType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let imm = self.sign_val();
+        let imm = self.sign_imm();
         write!(f, "{}, {}({})", self.rs2, imm, self.rs1)
     }
 }
@@ -203,7 +215,7 @@ pub struct BType {
 impl BType {
     /// Sign extend the raw immediate value of this B-type.
     #[inline]
-    pub fn sign_val(&self) -> i32 {
+    pub fn sign_imm(&self) -> i32 {
         let val = self.val as i32;
         (val << 19) >> 19
     }
@@ -211,7 +223,7 @@ impl BType {
 
 impl fmt::Display for BType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let imm = self.sign_val();
+        let imm = self.sign_imm();
         write!(f, "{}, {}, {}", self.rs1, self.rs2, imm)
     }
 }
@@ -226,16 +238,16 @@ pub struct UType {
 }
 
 impl UType {
-    /// Sign extend the raw immediate value of this U-type.
+    /// Get the immediate value of this U-type.
     #[inline]
-    pub fn sign_val(&self) -> i32 {
-        self.val as i32
+    pub fn imm(&self) -> u32 {
+        self.val
     }
 }
 
 impl fmt::Display for UType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let imm = self.sign_val();
+        let imm = self.imm();
         write!(f, "{}, {}", self.rd, imm >> 12)
     }
 }
@@ -252,7 +264,7 @@ pub struct JType {
 impl JType {
     /// Sign extend the raw immediate value of this J-type.
     #[inline]
-    pub fn sign_val(&self) -> i32 {
+    pub fn sign_imm(&self) -> i32 {
         let val = self.val as i32;
         (val << 11) >> 11
     }
@@ -260,7 +272,7 @@ impl JType {
 
 impl fmt::Display for JType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let imm = self.sign_val();
+        let imm = self.sign_imm();
         write!(f, "{}, {}", self.rd, imm,)
     }
 }
