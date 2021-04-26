@@ -9,7 +9,7 @@ pub fn exec(ext: &mut Extension, inst: Instruction) {
         Instruction::ADDI(ty) => {
             let src = ext.read_register(ty.rs);
 
-            let val = Address::from(ty.sign_val() as u64);
+            let val = Address::from(ty.sign_val() as u32);
             let val = src + val;
 
             ext.write_register(ty.rd, val);

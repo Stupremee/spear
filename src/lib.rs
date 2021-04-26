@@ -39,7 +39,7 @@ impl Architecture {
     /// Create an architecture that uses the RV32I extension.
     pub fn rv32i() -> Self {
         Self {
-            base: Default::default(),
+            base: extensions::rv32i::Extension::new_32bit(),
         }
     }
 

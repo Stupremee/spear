@@ -183,12 +183,12 @@ mod tests {
     #[test]
     fn read_write_ram() {
         let mut mem = Memory::new();
-        mem.add_device(0xABCD_0000.into(), RamDevice::new(256));
+        mem.add_device(0xABCD_0000u32.into(), RamDevice::new(256));
 
-        assert_eq!(mem.read::<u64>(0x8000_0000.into()), None);
-        assert_eq!(mem.read::<u64>(0xABCD_0000.into()), Some(0u64));
+        assert_eq!(mem.read::<u64>(0x8000_0000u32.into()), None);
+        assert_eq!(mem.read::<u64>(0xABCD_0000u32.into()), Some(0u64));
 
-        assert_eq!(mem.write::<u64>(0xABCD_0000.into(), 0x1234), Some(()));
-        assert_eq!(mem.read::<u64>(0xABCD_0000.into()), Some(0x1234));
+        assert_eq!(mem.write::<u64>(0xABCD_0000u32.into(), 0x1234), Some(()));
+        assert_eq!(mem.read::<u64>(0xABCD_0000u32.into()), Some(0x1234));
     }
 }

@@ -11,23 +11,23 @@ mod parse;
 pub use parse::parse;
 
 /// The RV32I base extension.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Extension {
-    registers: [Address; 31],
+    registers: [Address; 32],
 }
 
 impl Extension {
-    /// Create a new RV32I extension.
-    pub fn new() -> Self {
+    /// Create a new RV32I extension, that uses 32-bit wide registers.
+    pub fn new_32bit() -> Self {
         Self {
-            registers: [0.into(); 31],
+            registers: [0u32.into(); 32],
         }
     }
 
     /// Read the given register out of this extension.
     pub fn read_register(&self, reg: Register) -> Address {
         if reg.0 == 0 {
-            0.into()
+            self.registers[0]
         } else {
             *self
                 .registers
