@@ -11,11 +11,8 @@ pub mod memory;
 
 /// Trait for representing an extension-independent instruction.
 pub trait Instruction {
-    /// The associated extension for this instruction.
-    type Ext: Extension;
-
     /// Execute this instruction on the given CPU, with the context of the associated extension.
-    fn exec(self, ext: &mut Self::Ext);
+    fn exec(self, cpu: &mut cpu::Cpu);
 }
 
 /// A trait that represents a RISC-V ISA extension.
@@ -23,7 +20,7 @@ pub trait Instruction {
 /// This trait allows dynamic changing of the available extensions at runtime.
 pub trait Extension {
     /// The instruction type of this extension
-    type Inst: Instruction<Ext = Self>;
+    type Inst: Instruction;
 
     /// Try to parse an instruction present in this extension, from the raw bytes.
     fn parse_instruction(&self, _: u32) -> Option<Self::Inst>;

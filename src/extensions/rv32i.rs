@@ -1,6 +1,6 @@
 //! Implementation of the RV32I base extension.
 
-use crate::Address;
+use crate::{cpu, Address};
 use derive_more::{Display, From, Into};
 use std::fmt;
 
@@ -372,9 +372,8 @@ pub enum Instruction {
 }
 
 impl crate::Instruction for Instruction {
-    type Ext = Extension;
-
-    fn exec(self, ext: &mut Self::Ext) {
-        exec(ext, self)
+    fn exec(self, cpu: &mut cpu::Cpu) {
+        let cpu = cpu::CpuOrExtension::new(cpu, |cpu| &mut cpu.arch().base);
+        exec(self, cpu)
     }
 }
