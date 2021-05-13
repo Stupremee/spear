@@ -5,7 +5,9 @@ use std::ops;
 /// Different representations of an address.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AddressKind {
+    /// 32-bit address
     U32(u32),
+    /// 64-bit address
     U64(u64),
 }
 
@@ -57,7 +59,9 @@ impl From<Address> for u64 {
 /// Different representations of an address.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SignedAddressKind {
+    /// 32-bit address
     I32(i32),
+    /// 64-bit address
     I64(i64),
 }
 
@@ -66,6 +70,15 @@ pub enum SignedAddressKind {
 pub struct SignedAddress(SignedAddressKind);
 
 impl SignedAddress {
+    /// Convert this value into a unsigned value.
+    #[inline]
+    pub fn unsigned(self) -> Address {
+        match self.0 {
+            SignedAddressKind::I32(x) => (x as u32).into(),
+            SignedAddressKind::I64(x) => (x as u64).into(),
+        }
+    }
+
     /// Get the inner representation of this address.
     #[inline]
     pub fn kind(self) -> SignedAddressKind {
@@ -82,6 +95,39 @@ impl From<i64> for SignedAddress {
 impl From<i32> for SignedAddress {
     fn from(x: i32) -> Self {
         Self(SignedAddressKind::I32(x))
+    }
+}
+
+impl ops::Shl<u32> for Address {
+    type Output = Address;
+
+    fn shl(self, x: u32) -> Self::Output {
+        match self.0 {
+            AddressKind::U64(a) => (a << x).into(),
+            AddressKind::U32(a) => (a << x).into(),
+        }
+    }
+}
+
+impl ops::Shr<u32> for Address {
+    type Output = Address;
+
+    fn shr(self, x: u32) -> Self::Output {
+        match self.0 {
+            AddressKind::U64(a) => (a >> x).into(),
+            AddressKind::U32(a) => (a >> x).into(),
+        }
+    }
+}
+
+impl ops::Shr<u32> for SignedAddress {
+    type Output = SignedAddress;
+
+    fn shr(self, x: u32) -> Self::Output {
+        match self.0 {
+            SignedAddressKind::I64(a) => (a >> x).into(),
+            SignedAddressKind::I32(a) => (a >> x).into(),
+        }
     }
 }
 

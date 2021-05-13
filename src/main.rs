@@ -21,7 +21,7 @@ fn main() {
     for _ in 0..10 {
         cpu.step().unwrap();
     }
-    println!("{:x?}", cpu.arch().base());
+    println!("{}", cpu.arch().base());
 
     //println!("{:#x?}", mem.read::<u32>(0x8020_0000.into()));
     // 97 91 01 00

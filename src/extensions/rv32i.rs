@@ -63,6 +63,21 @@ impl Extension {
     }
 }
 
+impl fmt::Display for Extension {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "pc: {:#x?}", u64::from(self.pc))?;
+        for reg in 0..32 {
+            writeln!(
+                f,
+                "{}: {:#x?}",
+                Register::from(reg),
+                u64::from(self.registers[reg as usize])
+            )?;
+        }
+        Ok(())
+    }
+}
+
 impl crate::Extension for Extension {
     type Inst = Instruction;
 
@@ -168,6 +183,12 @@ impl IType {
     pub fn sign_imm(&self) -> i32 {
         let val = self.val as i32;
         (val << 20) >> 20
+    }
+
+    /// Get the shift amount of this I-type.
+    #[inline]
+    pub fn shamt(&self) -> u8 {
+        (self.val & 0x1F) as u8
     }
 }
 
