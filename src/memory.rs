@@ -62,8 +62,10 @@ impl Memory {
             .sections()
             .filter(|sec| sec.size() != 0 && sec.address() != 64)
         {
-            let dev = RamDevice::from_vec(section.data()?.to_vec());
-            self.add_device(section.address().into(), dev);
+            if section.name().unwrap() == ".text" {
+                let dev = RamDevice::from_vec(section.data()?.to_vec());
+                self.add_device(section.address().into(), dev);
+            }
         }
 
         Ok(())

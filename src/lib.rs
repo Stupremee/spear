@@ -9,10 +9,25 @@ pub mod cpu;
 pub mod extensions;
 pub mod memory;
 
+/// Outcomes of an instruction execution which influences the behaviour of the CPU after
+/// an instruction was executed.
+#[derive(Debug, Clone, Copy)]
+pub enum Continuation {
+    /// The instruction was a jump, thus, the PC is not increased.
+    Jump,
+    /// This was a "normal" instruction and the PC can be increased normally to point to the next
+    /// instruction.
+    Next,
+}
+
 /// Trait for representing an extension-independent instruction.
+#[allow(clippy::len_without_is_empty)]
 pub trait Instruction {
+    /// The length in bytes of this instruction.
+    fn len(&self) -> usize;
+
     /// Execute this instruction on the given CPU, with the context of the associated extension.
-    fn exec(self, cpu: &mut cpu::Cpu);
+    fn exec(self, cpu: &mut cpu::Cpu) -> Continuation;
 }
 
 /// A trait that represents a RISC-V ISA extension.

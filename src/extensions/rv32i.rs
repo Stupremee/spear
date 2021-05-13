@@ -1,8 +1,8 @@
 //! Implementation of the RV32I base extension.
 
-use crate::{cpu, Address};
+use crate::{cpu, Address, Continuation};
 use derive_more::{Display, From, Into};
-use std::fmt;
+use std::{fmt, mem::discriminant};
 
 mod exec;
 pub use exec::exec;
@@ -28,23 +28,27 @@ impl Extension {
 
     /// Read the given register out of this extension.
     pub fn read_register(&self, reg: Register) -> Address {
-        if reg.0 == 0 {
-            self.registers[0]
-        } else {
-            *self
-                .registers
-                .get(reg.0 as usize - 1)
-                .expect("tried to access invalid register")
-        }
+        *self
+            .registers
+            .get(reg.0 as usize)
+            .expect("tried to access invalid register")
     }
 
     /// Write the given value into `reg`.
     pub fn write_register(&mut self, reg: Register, x: Address) {
         if reg.0 != 0 {
-            *self
+            let reg = self
                 .registers
-                .get_mut(reg.0 as usize - 1)
-                .expect("tried to access invalid register") = x;
+                .get_mut(reg.0 as usize)
+                .expect("tried to access invalid register");
+
+            assert_eq!(
+                discriminant(&x.kind()),
+                discriminant(&reg.kind()),
+                "tried to store invalid address kind"
+            );
+
+            *reg = x;
         }
     }
 
@@ -372,8 +376,12 @@ pub enum Instruction {
 }
 
 impl crate::Instruction for Instruction {
-    fn exec(self, cpu: &mut cpu::Cpu) {
+    fn exec(self, cpu: &mut cpu::Cpu) -> Continuation {
         let cpu = cpu::CpuOrExtension::new(cpu, |cpu| &mut cpu.arch().base);
         exec(self, cpu)
+    }
+
+    fn len(&self) -> usize {
+        4
     }
 }

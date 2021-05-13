@@ -2,9 +2,9 @@ use std::ops;
 
 // TODO: Use an address representation, that is not 16 bytes large.
 
-/// Private representation of an address.
+/// Different representations of an address.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum Inner {
+pub enum AddressKind {
     U32(u32),
     U64(u64),
 }
@@ -14,60 +14,74 @@ enum Inner {
 /// This type also provides abstractions for converting between 32 and 64 (and soon 128)
 /// bit addresses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Address(Inner);
+pub struct Address(AddressKind);
 
 impl Address {
     /// Convert this value into a signed value.
     #[inline]
     pub fn signed(self) -> SignedAddress {
         match self.0 {
-            Inner::U32(x) => (x as i32).into(),
-            Inner::U64(x) => (x as i64).into(),
+            AddressKind::U32(x) => (x as i32).into(),
+            AddressKind::U64(x) => (x as i64).into(),
         }
+    }
+
+    /// Get the inner representation of this address.
+    #[inline]
+    pub fn kind(self) -> AddressKind {
+        self.0
     }
 }
 
 impl From<u64> for Address {
     fn from(x: u64) -> Self {
-        Self(Inner::U64(x))
+        Self(AddressKind::U64(x))
     }
 }
 
 impl From<u32> for Address {
     fn from(x: u32) -> Self {
-        Self(Inner::U32(x))
+        Self(AddressKind::U32(x))
     }
 }
 
 impl From<Address> for u64 {
     fn from(x: Address) -> Self {
         match x.0 {
-            Inner::U32(x) => x as u64,
-            Inner::U64(x) => x,
+            AddressKind::U32(x) => x as u64,
+            AddressKind::U64(x) => x,
         }
     }
 }
 
-/// Private representation of a signed address.
+/// Different representations of an address.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum SignedInner {
+pub enum SignedAddressKind {
     I32(i32),
     I64(i64),
 }
 
 /// Type-Safe representation of a pointer-wide signed value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SignedAddress(SignedInner);
+pub struct SignedAddress(SignedAddressKind);
+
+impl SignedAddress {
+    /// Get the inner representation of this address.
+    #[inline]
+    pub fn kind(self) -> SignedAddressKind {
+        self.0
+    }
+}
 
 impl From<i64> for SignedAddress {
     fn from(x: i64) -> Self {
-        Self(SignedInner::I64(x))
+        Self(SignedAddressKind::I64(x))
     }
 }
 
 impl From<i32> for SignedAddress {
     fn from(x: i32) -> Self {
-        Self(SignedInner::I32(x))
+        Self(SignedAddressKind::I32(x))
     }
 }
 
@@ -78,10 +92,10 @@ macro_rules! impl_op {
 
             fn $method(self, x: Address) -> Self {
                 match (self.0, x.0) {
-                    (Inner::U64(a), Inner::U64(b)) => a.$op(b).into(),
-                    (Inner::U32(a), Inner::U32(b)) => a.$op(b).into(),
-                    (Inner::U64(a), Inner::U32(b)) => a.$op(b as u64).into(),
-                    (Inner::U32(a), Inner::U64(b)) => a.$op(b as u32).into(),
+                    (AddressKind::U64(a), AddressKind::U64(b)) => a.$op(b).into(),
+                    (AddressKind::U32(a), AddressKind::U32(b)) => a.$op(b).into(),
+                    (AddressKind::U64(a), AddressKind::U32(b)) => a.$op(b as u64).into(),
+                    (AddressKind::U32(a), AddressKind::U64(b)) => a.$op(b as u32).into(),
                 }
             }
         }
@@ -91,8 +105,8 @@ macro_rules! impl_op {
 
             fn $method(self, x: u64) -> Self {
                 match self.0 {
-                    Inner::U64(a) => a.$op(x).into(),
-                    Inner::U32(a) => a.$op(x as u32).into(),
+                    AddressKind::U64(a) => a.$op(x).into(),
+                    AddressKind::U32(a) => a.$op(x as u32).into(),
                 }
             }
         }
@@ -102,8 +116,8 @@ macro_rules! impl_op {
 
             fn $method(self, x: u32) -> Self {
                 match self.0 {
-                    Inner::U64(a) => a.$op(x as u64).into(),
-                    Inner::U32(a) => a.$op(x).into(),
+                    AddressKind::U64(a) => a.$op(x as u64).into(),
+                    AddressKind::U32(a) => a.$op(x).into(),
                 }
             }
         }
@@ -125,10 +139,14 @@ macro_rules! impl_sign_op {
 
             fn $method(self, x: SignedAddress) -> Self {
                 match (self.0, x.0) {
-                    (SignedInner::I64(a), SignedInner::I64(b)) => a.$op(b).into(),
-                    (SignedInner::I32(a), SignedInner::I32(b)) => a.$op(b).into(),
-                    (SignedInner::I64(a), SignedInner::I32(b)) => a.$op(b as i64).into(),
-                    (SignedInner::I32(a), SignedInner::I64(b)) => a.$op(b as i32).into(),
+                    (SignedAddressKind::I64(a), SignedAddressKind::I64(b)) => a.$op(b).into(),
+                    (SignedAddressKind::I32(a), SignedAddressKind::I32(b)) => a.$op(b).into(),
+                    (SignedAddressKind::I64(a), SignedAddressKind::I32(b)) => {
+                        a.$op(b as i64).into()
+                    }
+                    (SignedAddressKind::I32(a), SignedAddressKind::I64(b)) => {
+                        a.$op(b as i32).into()
+                    }
                 }
             }
         }
@@ -138,8 +156,8 @@ macro_rules! impl_sign_op {
 
             fn $method(self, x: i64) -> Self {
                 match self.0 {
-                    SignedInner::I64(a) => a.$op(x).into(),
-                    SignedInner::I32(a) => a.$op(x as i32).into(),
+                    SignedAddressKind::I64(a) => a.$op(x).into(),
+                    SignedAddressKind::I32(a) => a.$op(x as i32).into(),
                 }
             }
         }
@@ -149,8 +167,8 @@ macro_rules! impl_sign_op {
 
             fn $method(self, x: i32) -> Self {
                 match self.0 {
-                    SignedInner::I64(a) => a.$op(x as i64).into(),
-                    SignedInner::I32(a) => a.$op(x).into(),
+                    SignedAddressKind::I64(a) => a.$op(x as i64).into(),
+                    SignedAddressKind::I32(a) => a.$op(x).into(),
                 }
             }
         }

@@ -1,7 +1,7 @@
 //! The core of the emulator that is responsible for executing
 //! RISC-V code.
 
-use crate::{memory::Memory, Address, Architecture, Extension, Instruction};
+use crate::{memory::Memory, Address, Architecture, Continuation, Extension, Instruction};
 use bytemuck::Pod;
 
 /// Helper providing mutable access to either a CPU, or a extension inside a CPU.
@@ -46,7 +46,12 @@ impl Cpu {
         let pc = self.arch.base.read_register(2.into());
         let inst = self.mem.read::<u32>(pc)?;
         let inst = self.arch.base.parse_instruction(inst)?;
-        inst.exec(self);
+        let new_pc = pc + inst.len() as u64;
+
+        match inst.exec(self) {
+            Continuation::Next => self.arch.base.write_register(2.into(), new_pc),
+            Continuation::Jump => {}
+        }
 
         Some(())
     }
