@@ -1,7 +1,7 @@
 //! Physical memory management.
 //!
 //! The main type of this module is the [`Memory`] struct, which contains
-//! a list of [`MemoryDevices`]s that are used to read, and write raw memory.
+//! a list of [`MemoryDevice`]s that are used to read, and write raw memory.
 
 use super::Address;
 use bytemuck::{bytes_of, bytes_of_mut, Pod};

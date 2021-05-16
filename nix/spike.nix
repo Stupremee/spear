@@ -7,8 +7,8 @@ stdenv.mkDerivation rec {
   src = fetchFromGitHub {
     owner = "riscv";
     repo = "riscv-isa-sim";
-    rev = "6c18ef569c210daf9713b4f26bc0c4f2c3769457";
-    sha256 = "sha256-auVAWzSAI5FunnbEVbhfP3wbiP0v/HX93MKt+/9QMMo=";
+    rev = "0981d396bca516a2b17db4cf744b8463b210c4cc";
+    sha256 = "sha256-sNFW0X1Tl0atu/Ors6nqowkElMLp6ExkOrI0lwtIbWE=";
   };
 
   nativeBuildInputs = [ dtc ];

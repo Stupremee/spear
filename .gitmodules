@@ -1,0 +1,6 @@
+[submodule "tests/riscv-arch-test"]
+	path = tests/riscv-arch-test
+	url = https://github.com/riscv/riscv-arch-test
+[submodule "tests/riscof"]
+	path = tests/riscof
+	url = https://gitlab.com/incoresemi/riscof
