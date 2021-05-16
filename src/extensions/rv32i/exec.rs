@@ -14,7 +14,7 @@ pub fn exec(inst: Instruction, mut cpu: cpu::CpuOrExtension<'_, Extension>) -> C
         Instruction::LUI(op) => ext.write_register(op.rd, Address::from(op.imm())),
         Instruction::AUIPC(op) => {
             let pc = ext.get_pc() + op.imm();
-            ext.set_pc(pc);
+            ext.write_register(op.rd, pc);
         }
 
         Instruction::JAL(op) => {
