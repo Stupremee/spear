@@ -1,18 +1,18 @@
 //! Tests for decoding instructions.
 
 macro_rules! test_instructions {
-    ($($name:ident {
+    ($ext:ident, $($name:ident {
         $($raw:literal: $str:literal),*$(,)?
     })*) => {
         $(#[test]
         fn $name() {$(
-            let inst = spear::extensions::rv32i::parse($raw).unwrap();
+            let inst = spear::extensions::$ext::parse($raw).unwrap();
             assert_eq!(inst.to_string(), $str);
         )*})*
     };
 }
 
-test_instructions! {
+test_instructions! { rv32i,
     test_lui_inst {
         0x000007B7: "lui a5, 0",
         0x00F0F5B7: "lui a1, 3855",
@@ -82,8 +82,12 @@ test_instructions! {
     test_ebreak_inst {
         0x00100073: "ebreak",
     }
+}
 
+test_instructions! { zicsr,
     test_csrrw_inst {
-        0x00100073: "ebreak",
+        0x000012F3: "csrrw t0, zero, 0",
+        0x300012F3: "csrrw t0, zero, 768",
+        0x00031073: "csrrw zero, t1, 0",
     }
 }

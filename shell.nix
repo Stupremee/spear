@@ -20,6 +20,7 @@ pkgs.mkShell {
     rust
     rustfmt
 
+    llvm_11
     binutils
     python3
     dtc

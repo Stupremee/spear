@@ -27,23 +27,28 @@ impl crate::Extension for Extension {
     type Inst = Instruction;
 
     fn parse_instruction(&self, inst: u32) -> Option<Self::Inst> {
-        // the opcode is `0b1110011` for every Zicsr instruction
-        if inst & 0x7F != 0b1110011 {
-            return None;
-        }
-
-        let (funct3, ty) = IType::parse(inst);
-        let inst = match funct3 {
-            0b001 => Instruction::CSRRW,
-            0b010 => Instruction::CSRRS,
-            0b011 => Instruction::CSRRC,
-            0b101 => Instruction::CSRRWI,
-            0b110 => Instruction::CSRRSI,
-            0b111 => Instruction::CSRRCI,
-            _ => return None,
-        };
-        Some(inst(ty))
+        parse(inst)
     }
+}
+
+/// Top level function for parsing a Zicsr instruction.
+pub fn parse(inst: u32) -> Option<Instruction> {
+    // the opcode is `0b1110011` for every Zicsr instruction
+    if inst & 0x7F != 0b1110011 {
+        return None;
+    }
+
+    let (funct3, ty) = IType::parse(inst);
+    let inst = match funct3 {
+        0b001 => Instruction::CSRRW,
+        0b010 => Instruction::CSRRS,
+        0b011 => Instruction::CSRRC,
+        0b101 => Instruction::CSRRWI,
+        0b110 => Instruction::CSRRSI,
+        0b111 => Instruction::CSRRCI,
+        _ => return None,
+    };
+    Some(inst(ty))
 }
 
 /// The instruction type of the Zicsr base extension.
