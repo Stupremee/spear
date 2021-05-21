@@ -76,15 +76,12 @@ impl Cpu {
     fn parse_and_exec(&mut self, inst: u32) -> Option<(u32, Continuation)> {
         if let Some(inst) = self.arch.base.parse_instruction(inst) {
             Some((inst.len(), inst.exec(self)))
-        } else if let Some(inst) = self
-            .arch
-            .zicsr
-            .as_ref()
-            .and_then(|ext| ext.parse_instruction(inst))
-        {
-            Some((inst.len(), inst.exec(self)))
         } else {
-            None
+            self.arch
+                .zicsr
+                .as_ref()
+                .and_then(|ext| ext.parse_instruction(inst))
+                .map(|inst| (inst.len(), inst.exec(self)))
         }
     }
 

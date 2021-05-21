@@ -72,11 +72,11 @@ pub enum Instruction {
 
 impl crate::Instruction for Instruction {
     fn exec(self, cpu: &mut cpu::Cpu) -> Continuation {
-        fn ext<'cpu>(cpu: &'cpu mut cpu::Cpu) -> &'cpu mut Extension {
+        fn ext(cpu: &mut cpu::Cpu) -> &mut Extension {
             cpu.arch().zicsr.as_mut().unwrap()
         }
 
-        fn base<'cpu>(cpu: &'cpu mut cpu::Cpu) -> &'cpu mut super::rv32i::Extension {
+        fn base(cpu: &mut cpu::Cpu) -> &mut super::rv32i::Extension {
             cpu.arch().base()
         }
 
