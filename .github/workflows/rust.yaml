@@ -20,7 +20,6 @@ jobs:
           - { rust: stable,           os: ubuntu-latest }
           - { rust: stable,           os: macos-latest }
           - { rust: stable,           os: windows-latest }
-          - { rust: stable-i686-msvc, os: windows-latest }
           - { rust: beta,             os: ubuntu-latest }
           - { rust: nightly,          os: ubuntu-latest }
     steps:
@@ -29,8 +28,6 @@ jobs:
         with:
           rust-version: ${{ matrix.rust }}
       - run: cargo test --verbose --workspace
-      - run: cargo test --verbose --workspace --all-features
-      - run: cargo test --verbose --workspace --no-default-features
 
   clippy:
     name: Lint with clippy
@@ -43,8 +40,6 @@ jobs:
         with:
           components: clippy
       - run: cargo clippy --workspace --all-targets --verbose
-      - run: cargo clippy --workspace --all-targets --verbose --no-default-features
-      - run: cargo clippy --workspace --all-targets --verbose --all-features
 
   rustfmt:
     name: Verify code formatting
@@ -55,3 +50,15 @@ jobs:
         with:
           components: rustfmt
       - run: cargo fmt --all -- --check
+
+  documentation:
+    name: Check documentation
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: -Dwarnings
+    steps:
+      - uses: actions/checkout@v2
+      - uses: hecrj/setup-rust-action@v1
+        with:
+          components: rustdoc
+      - run: cargo doc --all
