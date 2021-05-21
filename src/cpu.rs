@@ -3,6 +3,7 @@
 
 use crate::{memory::Memory, Address, Architecture, Continuation, Extension, Instruction};
 use bytemuck::Pod;
+use object::Object;
 
 /// Helper providing mutable access to either a CPU, or a extension inside a CPU.
 pub struct CpuOrExtension<'cpu, Ext> {
@@ -40,16 +41,30 @@ impl Cpu {
         Self { arch, mem }
     }
 
+    /// Create a CPU that will execute the given object file.
+    pub fn from_object(object: object::File<'_>) -> object::Result<Self> {
+        let mut arch = Architecture::rv32i();
+
+        // set the entry point
+        arch.base().set_pc(object.entry().into());
+
+        // load the file into memory
+        let mut mem = Memory::new();
+        mem.load_object(object)?;
+
+        Ok(Self::new(arch, mem))
+    }
+
     /// Perfom one step inside the CPU, that will fetch an instrution, decode it, and then execute
     /// it.
     pub fn step(&mut self) -> Option<()> {
-        let pc = self.arch.base.read_register(2.into());
+        let pc = self.arch.base.get_pc();
         let inst = self.mem.read::<u32>(pc)?;
         let inst = self.arch.base.parse_instruction(inst)?;
         let new_pc = pc + inst.len() as u64;
 
         match inst.exec(self) {
-            Continuation::Next => self.arch.base.write_register(2.into(), new_pc),
+            Continuation::Next => self.arch.base.set_pc(new_pc),
             Continuation::Jump => {}
         }
 
@@ -69,5 +84,10 @@ impl Cpu {
     /// Return a reference to the underyling architecture of this CPU.
     pub fn arch(&mut self) -> &mut Architecture {
         &mut self.arch
+    }
+
+    /// Return a reference to the underyling memory of this CPU.
+    pub fn mem(&mut self) -> &mut Memory {
+        &mut self.mem
     }
 }

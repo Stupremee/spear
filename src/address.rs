@@ -1,9 +1,8 @@
+use std::cmp::Ordering;
 use std::ops;
 
-// TODO: Use an address representation, that is not 16 bytes large.
-
 /// Different representations of an address.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy)]
 pub enum AddressKind {
     /// 32-bit address
     U32(u32),
@@ -15,7 +14,7 @@ pub enum AddressKind {
 ///
 /// This type also provides abstractions for converting between 32 and 64 (and soon 128)
 /// bit addresses.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy)]
 pub struct Address(AddressKind);
 
 impl Address {
@@ -32,6 +31,40 @@ impl Address {
     #[inline]
     pub fn kind(self) -> AddressKind {
         self.0
+    }
+}
+
+impl PartialEq for Address {
+    fn eq(&self, other: &Self) -> bool {
+        match (self.0, other.0) {
+            (AddressKind::U64(a), AddressKind::U64(b)) => a == b,
+            (AddressKind::U32(a), AddressKind::U32(b)) => a == b,
+            (AddressKind::U64(a), AddressKind::U32(b)) => a == b as u64,
+            (AddressKind::U32(a), AddressKind::U64(b)) => a == b as u32,
+        }
+    }
+}
+impl Eq for Address {}
+
+impl PartialOrd for Address {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self.0, other.0) {
+            (AddressKind::U64(a), AddressKind::U64(ref b)) => a.partial_cmp(b),
+            (AddressKind::U32(a), AddressKind::U32(ref b)) => a.partial_cmp(b),
+            (AddressKind::U64(a), AddressKind::U32(b)) => a.partial_cmp(&(b as u64)),
+            (AddressKind::U32(a), AddressKind::U64(b)) => a.partial_cmp(&(b as u32)),
+        }
+    }
+}
+
+impl Ord for Address {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self.0, other.0) {
+            (AddressKind::U64(a), AddressKind::U64(ref b)) => a.cmp(b),
+            (AddressKind::U32(a), AddressKind::U32(ref b)) => a.cmp(b),
+            (AddressKind::U64(a), AddressKind::U32(b)) => a.cmp(&(b as u64)),
+            (AddressKind::U32(a), AddressKind::U64(b)) => a.cmp(&(b as u32)),
+        }
     }
 }
 
@@ -57,7 +90,7 @@ impl From<Address> for u64 {
 }
 
 /// Different representations of an address.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy)]
 pub enum SignedAddressKind {
     /// 32-bit address
     I32(i32),
@@ -66,7 +99,7 @@ pub enum SignedAddressKind {
 }
 
 /// Type-Safe representation of a pointer-wide signed value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy)]
 pub struct SignedAddress(SignedAddressKind);
 
 impl SignedAddress {
@@ -83,6 +116,40 @@ impl SignedAddress {
     #[inline]
     pub fn kind(self) -> SignedAddressKind {
         self.0
+    }
+}
+
+impl PartialEq for SignedAddress {
+    fn eq(&self, other: &Self) -> bool {
+        match (self.0, other.0) {
+            (SignedAddressKind::I64(a), SignedAddressKind::I64(b)) => a == b,
+            (SignedAddressKind::I32(a), SignedAddressKind::I32(b)) => a == b,
+            (SignedAddressKind::I64(a), SignedAddressKind::I32(b)) => a == b as i64,
+            (SignedAddressKind::I32(a), SignedAddressKind::I64(b)) => a == b as i32,
+        }
+    }
+}
+impl Eq for SignedAddress {}
+
+impl PartialOrd for SignedAddress {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self.0, other.0) {
+            (SignedAddressKind::I64(a), SignedAddressKind::I64(ref b)) => a.partial_cmp(b),
+            (SignedAddressKind::I32(a), SignedAddressKind::I32(ref b)) => a.partial_cmp(b),
+            (SignedAddressKind::I64(a), SignedAddressKind::I32(b)) => a.partial_cmp(&(b as i64)),
+            (SignedAddressKind::I32(a), SignedAddressKind::I64(b)) => a.partial_cmp(&(b as i32)),
+        }
+    }
+}
+
+impl Ord for SignedAddress {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self.0, other.0) {
+            (SignedAddressKind::I64(a), SignedAddressKind::I64(ref b)) => a.cmp(b),
+            (SignedAddressKind::I32(a), SignedAddressKind::I32(ref b)) => a.cmp(b),
+            (SignedAddressKind::I64(a), SignedAddressKind::I32(b)) => a.cmp(&(b as i64)),
+            (SignedAddressKind::I32(a), SignedAddressKind::I64(b)) => a.cmp(&(b as i32)),
+        }
     }
 }
 

@@ -5,7 +5,7 @@
 
 use super::Address;
 use bytemuck::{bytes_of, bytes_of_mut, Pod};
-use object::{File, Object, ObjectSection};
+use object::{File, Object, ObjectSegment};
 use std::collections::BTreeMap;
 use std::mem::align_of;
 
@@ -55,17 +55,13 @@ impl Memory {
     ///
     /// This method will create multiple RAM devices into this memory bus.
     pub fn load_object(&mut self, obj: File<'_>) -> object::Result<()> {
+        // FIXME: Check for RISC-V architecture
         assert!(obj.is_little_endian(), "Big Endian not supported");
 
         // go through each section that is not at address zero and has no zero size
-        for section in obj
-            .sections()
-            .filter(|sec| sec.size() != 0 && sec.address() != 64)
-        {
-            if section.name().unwrap() == ".text" {
-                let dev = RamDevice::from_vec(section.data()?.to_vec());
-                self.add_device(section.address().into(), dev);
-            }
+        for seg in obj.segments() {
+            let dev = RamDevice::from_vec(seg.data()?.to_vec());
+            self.add_device(seg.address().into(), dev);
         }
 
         Ok(())
@@ -73,7 +69,7 @@ impl Memory {
 
     /// Add a new device to this memory bus, that starts at the `base` address.
     pub fn add_device(&mut self, base: Address, dev: impl MemoryDevice + 'static) {
-        // TODO: check overlap of addresses here
+        // FIXME: check overlap of addresses here
         self.devices.insert(base, Box::new(dev));
     }
 
