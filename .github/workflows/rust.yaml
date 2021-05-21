@@ -59,6 +59,4 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: hecrj/setup-rust-action@v1
-        with:
-          components: rustdoc
       - run: cargo doc --all
