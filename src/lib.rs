@@ -24,7 +24,7 @@ pub enum Continuation {
 #[allow(clippy::len_without_is_empty)]
 pub trait Instruction {
     /// The length in bytes of this instruction.
-    fn len(&self) -> usize;
+    fn len(&self) -> u32;
 
     /// Execute this instruction on the given CPU, with the context of the associated extension.
     fn exec(self, cpu: &mut cpu::Cpu) -> Continuation;
@@ -45,6 +45,7 @@ pub trait Extension {
 /// be used to run the emulator.
 pub struct Architecture {
     pub(crate) base: extensions::rv32i::Extension,
+    pub(crate) zicsr: Option<extensions::zicsr::Extension>,
 }
 
 impl Architecture {
@@ -52,6 +53,7 @@ impl Architecture {
     pub fn rv32i() -> Self {
         Self {
             base: extensions::rv32i::Extension::new_32bit(),
+            zicsr: Some(extensions::zicsr::Extension::new_32bit()),
         }
     }
 

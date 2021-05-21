@@ -82,4 +82,8 @@ test_instructions! {
     test_ebreak_inst {
         0x00100073: "ebreak",
     }
+
+    test_csrrw_inst {
+        0x00100073: "ebreak",
+    }
 }

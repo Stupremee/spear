@@ -60,15 +60,32 @@ impl Cpu {
     pub fn step(&mut self) -> Option<()> {
         let pc = self.arch.base.get_pc();
         let inst = self.mem.read::<u32>(pc)?;
-        let inst = self.arch.base.parse_instruction(inst)?;
-        let new_pc = pc + inst.len() as u64;
 
-        match inst.exec(self) {
+        let (len, c) = self.parse_and_exec(inst)?;
+        let new_pc = pc + len;
+
+        match c {
             Continuation::Next => self.arch.base.set_pc(new_pc),
             Continuation::Jump => {}
         }
 
         Some(())
+    }
+
+    // FIXME: Write macro or something else to make this better.
+    fn parse_and_exec(&mut self, inst: u32) -> Option<(u32, Continuation)> {
+        if let Some(inst) = self.arch.base.parse_instruction(inst) {
+            Some((inst.len(), inst.exec(self)))
+        } else if let Some(inst) = self
+            .arch
+            .zicsr
+            .as_ref()
+            .and_then(|ext| ext.parse_instruction(inst))
+        {
+            Some((inst.len(), inst.exec(self)))
+        } else {
+            None
+        }
     }
 
     /// Read a `T` from the given address.

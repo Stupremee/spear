@@ -2,3 +2,4 @@
 //! and execution engine.
 
 pub mod rv32i;
+pub mod zicsr;

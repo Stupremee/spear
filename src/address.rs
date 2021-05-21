@@ -165,6 +165,17 @@ impl From<i32> for SignedAddress {
     }
 }
 
+impl ops::Not for Address {
+    type Output = Address;
+
+    fn not(self) -> Self::Output {
+        match self.0 {
+            AddressKind::U64(a) => (!a).into(),
+            AddressKind::U32(a) => (!a).into(),
+        }
+    }
+}
+
 impl ops::Shl<u32> for Address {
     type Output = Address;
 

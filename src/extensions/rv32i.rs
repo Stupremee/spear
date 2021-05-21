@@ -402,7 +402,7 @@ impl crate::Instruction for Instruction {
         exec(self, cpu)
     }
 
-    fn len(&self) -> usize {
+    fn len(&self) -> u32 {
         4
     }
 }
