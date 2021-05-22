@@ -2,7 +2,7 @@
 //! specification.
 
 use super::rv32i::IType;
-use crate::{cpu, Address, Continuation};
+use crate::{cpu, trap::Result, Address, Continuation};
 use derive_more::Display;
 
 /// Number of CSR registers available.
@@ -71,7 +71,7 @@ pub enum Instruction {
 }
 
 impl crate::Instruction for Instruction {
-    fn exec(self, cpu: &mut cpu::Cpu) -> Continuation {
+    fn exec(self, cpu: &mut cpu::Cpu) -> Result<Continuation> {
         fn ext(cpu: &mut cpu::Cpu) -> &mut Extension {
             cpu.arch().zicsr.as_mut().unwrap()
         }
@@ -111,7 +111,6 @@ impl crate::Instruction for Instruction {
             inst(cpu, src.into(), op, f);
         }
 
-        println!("executing: {}", self);
         match self {
             Instruction::CSRRW(op) => reg_inst(cpu, op, |src, _| src),
             Instruction::CSRRS(op) => reg_inst(cpu, op, |src, old_csr| src | old_csr),
@@ -122,7 +121,7 @@ impl crate::Instruction for Instruction {
             Instruction::CSRRCI(op) => imm_inst(cpu, op, |src, old_csr| old_csr & !src),
         }
 
-        Continuation::Next
+        Ok(Continuation::Next)
     }
 
     fn len(&self) -> u32 {

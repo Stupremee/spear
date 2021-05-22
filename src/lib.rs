@@ -8,6 +8,7 @@ pub use address::{Address, AddressKind};
 pub mod cpu;
 pub mod extensions;
 pub mod memory;
+pub mod trap;
 
 /// Outcomes of an instruction execution which influences the behaviour of the CPU after
 /// an instruction was executed.
@@ -27,7 +28,7 @@ pub trait Instruction {
     fn len(&self) -> u32;
 
     /// Execute this instruction on the given CPU, with the context of the associated extension.
-    fn exec(self, cpu: &mut cpu::Cpu) -> Continuation;
+    fn exec(self, cpu: &mut cpu::Cpu) -> trap::Result<Continuation>;
 }
 
 /// A trait that represents a RISC-V ISA extension.

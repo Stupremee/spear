@@ -1,6 +1,6 @@
 //! Implementation of the RV32I base extension.
 
-use crate::{cpu, Address, Continuation};
+use crate::{cpu, trap, Address, Continuation};
 use derive_more::{Display, From, Into};
 use std::{fmt, mem::discriminant};
 
@@ -397,7 +397,7 @@ pub enum Instruction {
 }
 
 impl crate::Instruction for Instruction {
-    fn exec(self, cpu: &mut cpu::Cpu) -> Continuation {
+    fn exec(self, cpu: &mut cpu::Cpu) -> trap::Result<Continuation> {
         let cpu = cpu::CpuOrExtension::new(cpu, |cpu| &mut cpu.arch().base);
         exec(self, cpu)
     }

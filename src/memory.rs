@@ -4,6 +4,7 @@
 //! a list of [`MemoryDevice`]s that are used to read, and write raw memory.
 
 use super::Address;
+use crate::trap::{Exception, Result};
 use bytemuck::{bytes_of, bytes_of_mut, Pod};
 use object::{File, Object, ObjectSegment};
 use std::collections::BTreeMap;
@@ -23,9 +24,9 @@ pub trait MemoryDevice {
     ///
     /// # Returns
     ///
-    /// `true` if the load was successful and the **whole** buffer is filled. Not filling the buffer,
-    /// but returning `true`, will be the same behaviour as filling the buffer with zeros.
-    fn load(&self, addr: Address, buf: &mut [u8]) -> bool;
+    /// `Ok(())` if the load was successful and the **whole** buffer is filled. Not filling the buffer,
+    /// but returning `Ok(())`, will be the same behaviour as filling the buffer with zeros.
+    fn load(&self, addr: Address, buf: &mut [u8]) -> Result<()>;
 
     /// Write `buf`s contents to the given address.
     ///
@@ -33,9 +34,9 @@ pub trait MemoryDevice {
     ///
     /// # Returns
     ///
-    /// `true` if the write was successful and the **whole** buffer was written.
+    /// `Ok(())` if the write was successful and the **whole** buffer was written.
     /// Not writing the whole buffer, might lead to logic bugs.
-    fn write(&mut self, addr: Address, buf: &[u8]) -> bool;
+    fn write(&mut self, addr: Address, buf: &[u8]) -> Result<()>;
 }
 
 /// The main struct of this module, which acts as a memory bus combining multiple
@@ -78,27 +79,30 @@ impl Memory {
     /// # Returns
     ///
     /// `None` if the read failed.
-    pub fn read<T: Pod>(&self, addr: Address) -> Option<T> {
+    pub fn read<T: Pod>(&self, addr: Address) -> Result<T> {
         // check alignment of the address
         if u64::from(addr) & (align_of::<T>() as u64 - 1) != 0 {
-            return None;
+            return Err(Exception::LoadAddressMisaligned);
         }
 
         // find the device that has the smallest, positive distance
         // from the requested address
-        let (&offset, device) = self.devices.iter().find(|(&k, v)| {
-            let base = u64::from(k);
-            let end = base + v.size();
-            let addr = u64::from(addr);
+        let (&offset, device) = self
+            .devices
+            .iter()
+            .find(|(&k, v)| {
+                let base = u64::from(k);
+                let end = base + v.size();
+                let addr = u64::from(addr);
 
-            base <= addr && addr < end
-        })?;
+                base <= addr && addr < end
+            })
+            .ok_or(Exception::LoadAccessFault)?;
 
         // create a zeroed `T` to read into
         let mut item = T::zeroed();
-        device
-            .load(addr - offset, bytes_of_mut(&mut item))
-            .then(|| item)
+        device.load(addr - offset, bytes_of_mut(&mut item))?;
+        Ok(item)
     }
 
     /// Write a `T` to the given address.
@@ -107,23 +111,28 @@ impl Memory {
     ///
     /// `None` if the read failed, which may be caused by unaligned address,
     /// no physical memory for `addr` and others.
-    pub fn write<T: Pod>(&mut self, addr: Address, item: T) -> Option<()> {
+    pub fn write<T: Pod>(&mut self, addr: Address, item: T) -> Result<()> {
         // check alignment of the address
         if u64::from(addr) & (align_of::<T>() as u64 - 1) != 0 {
-            return None;
+            return Err(Exception::StoreAddressMisaligned);
         }
 
         // find the first device that contains the given address
-        let (&offset, device) = self.devices.iter_mut().find(|(&k, v)| {
-            let base = u64::from(k);
-            let end = base + v.size();
-            let addr = u64::from(addr);
+        let (&offset, device) = self
+            .devices
+            .iter_mut()
+            .find(|(&k, v)| {
+                let base = u64::from(k);
+                let end = base + v.size();
+                let addr = u64::from(addr);
 
-            base <= addr && addr < end
-        })?;
+                base <= addr && addr < end
+            })
+            .ok_or(Exception::StoreAccessFault)?;
 
         // write the item into the device
-        device.write(addr - offset, bytes_of(&item)).then(|| ())
+        device.write(addr - offset, bytes_of(&item))?;
+        Ok(())
     }
 }
 
@@ -153,23 +162,23 @@ impl MemoryDevice for RamDevice {
         self.ram.len() as u64
     }
 
-    fn load(&self, addr: Address, buf: &mut [u8]) -> bool {
+    fn load(&self, addr: Address, buf: &mut [u8]) -> Result<()> {
         let addr = u64::from(addr) as usize;
         if let Some(from) = self.ram.get(addr..addr + buf.len()) {
             buf.copy_from_slice(from);
-            true
+            Ok(())
         } else {
-            false
+            Err(Exception::LoadAccessFault)
         }
     }
 
-    fn write(&mut self, addr: Address, buf: &[u8]) -> bool {
+    fn write(&mut self, addr: Address, buf: &[u8]) -> Result<()> {
         let addr = u64::from(addr) as usize;
         if let Some(to) = self.ram.get_mut(addr..addr + buf.len()) {
             to.copy_from_slice(buf);
-            true
+            Ok(())
         } else {
-            false
+            Err(Exception::StoreAccessFault)
         }
     }
 }
@@ -183,10 +192,13 @@ mod tests {
         let mut mem = Memory::new();
         mem.add_device(0xABCD_0000u32.into(), RamDevice::new(256));
 
-        assert_eq!(mem.read::<u64>(0x8000_0000u32.into()), None);
-        assert_eq!(mem.read::<u64>(0xABCD_0000u32.into()), Some(0u64));
+        assert_eq!(
+            mem.read::<u64>(0x8000_0000u32.into()),
+            Err(Exception::LoadAccessFault)
+        );
+        assert_eq!(mem.read::<u64>(0xABCD_0000u32.into()), Ok(0u64));
 
-        assert_eq!(mem.write::<u64>(0xABCD_0000u32.into(), 0x1234), Some(()));
-        assert_eq!(mem.read::<u64>(0xABCD_0000u32.into()), Some(0x1234));
+        assert_eq!(mem.write::<u64>(0xABCD_0000u32.into(), 0x1234), Ok(()));
+        assert_eq!(mem.read::<u64>(0xABCD_0000u32.into()), Ok(0x1234));
     }
 }
