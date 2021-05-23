@@ -42,12 +42,10 @@ impl PrivilegeMode {
     pub fn can_access(self, other: PrivilegeMode) -> bool {
         use PrivilegeMode::*;
 
-        match (self, other) {
-            (Machine, _) => true,
-            (Supervisor, Supervisor | User) => true,
-            (User, User) => true,
-            _ => false,
-        }
+        matches!(
+            (self, other),
+            (Machine, _) | (Supervisor, Supervisor | User) | (User, User)
+        )
     }
 }
 
