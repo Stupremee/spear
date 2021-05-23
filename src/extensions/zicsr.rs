@@ -1,8 +1,20 @@
 //! Implementation of the `Zicsr` extension as specified in chapter 9 in the unprivileged
 //! specification.
 
+mod registers;
+pub use registers::CsrAddress;
+
+/// Common CSR constants.
+pub mod csr {
+    pub use super::registers::*;
+}
+
 use super::rv32i::IType;
-use crate::{cpu, trap::Result, Address, Continuation};
+use crate::{
+    cpu::{self, PrivilegeMode},
+    trap::{Exception, Result},
+    Address, Continuation,
+};
 use derive_more::Display;
 
 /// Number of CSR registers available.
@@ -20,6 +32,36 @@ impl Extension {
         Self {
             csrs: Box::new([Address::from(0u32); CSR_COUNT]),
         }
+    }
+
+    /// Try to write the given `val` to the CSR with the given index.
+    pub fn write_csr(&mut self, idx: usize, val: Address, mode: PrivilegeMode) -> Result<()> {
+        let csr = CsrAddress::try_new(idx).ok_or(Exception::IllegalInstruction)?;
+
+        if !csr.writeable_in(mode) {
+            return Err(Exception::IllegalInstruction);
+        }
+
+        let reg = &mut self.csrs[csr.0];
+        assert_eq!(
+            std::mem::discriminant(&val.kind()),
+            std::mem::discriminant(&reg.kind()),
+            "tried to store invalid address kind into CSR"
+        );
+        *reg = val;
+
+        Ok(())
+    }
+
+    /// Try to read a given CSR.
+    pub fn read_csr(&mut self, idx: usize, mode: PrivilegeMode) -> Result<Address> {
+        let csr = CsrAddress::try_new(idx).ok_or(Exception::IllegalInstruction)?;
+
+        if !csr.readable_in(mode) {
+            return Err(Exception::IllegalInstruction);
+        }
+
+        Ok(self.csrs[csr.0])
     }
 }
 
@@ -85,30 +127,34 @@ impl crate::Instruction for Instruction {
             src: Address,
             op: IType,
             f: F,
-        ) {
+        ) -> Result<()> {
+            let mode = cpu.mode();
             let ext = ext(cpu);
-            let old_csr = ext.csrs[op.val as usize];
+            let old_csr = ext.read_csr(op.val as usize, mode)?;
             let res = f(src, old_csr);
-            let reg = &mut ext.csrs[op.val as usize];
-
-            assert_eq!(
-                std::mem::discriminant(&res.kind()),
-                std::mem::discriminant(&reg.kind()),
-                "tried to store invalid address kind into CSR"
-            );
-
-            *reg = res;
+            ext.write_csr(op.val as usize, res, mode)?;
             base(cpu).write_register(op.rd, old_csr);
+            Ok(())
         }
 
-        fn reg_inst<F: FnOnce(Address, Address) -> Address>(cpu: &mut cpu::Cpu, op: IType, f: F) {
+        fn reg_inst<F: FnOnce(Address, Address) -> Address>(
+            cpu: &mut cpu::Cpu,
+            op: IType,
+            f: F,
+        ) -> Result<()> {
             let src = base(cpu).read_register(op.rs);
-            inst(cpu, src, op, f);
+            inst(cpu, src, op, f)?;
+            Ok(())
         }
 
-        fn imm_inst<F: FnOnce(Address, Address) -> Address>(cpu: &mut cpu::Cpu, op: IType, f: F) {
+        fn imm_inst<F: FnOnce(Address, Address) -> Address>(
+            cpu: &mut cpu::Cpu,
+            op: IType,
+            f: F,
+        ) -> Result<()> {
             let src = u8::from(op.rs) as u32;
-            inst(cpu, src.into(), op, f);
+            inst(cpu, src.into(), op, f)?;
+            Ok(())
         }
 
         match self {
@@ -120,8 +166,7 @@ impl crate::Instruction for Instruction {
             Instruction::CSRRSI(op) => imm_inst(cpu, op, |src, old_csr| src | old_csr),
             Instruction::CSRRCI(op) => imm_inst(cpu, op, |src, old_csr| old_csr & !src),
         }
-
-        Ok(Continuation::Next)
+        .map(|_| Continuation::Next)
     }
 
     fn len(&self) -> u32 {

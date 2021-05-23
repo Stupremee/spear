@@ -10,7 +10,7 @@ use bytemuck::Pod;
 use object::Object;
 
 /// Different privilege modes a CPU core can be in.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PrivilegeMode {
     /// The highest privilege mode.
     Machine,
@@ -18,6 +18,37 @@ pub enum PrivilegeMode {
     Supervisor,
     /// The user privilege mode.
     User,
+}
+
+impl PrivilegeMode {
+    /// Get the first two bits from the byte and turn them into a privilege mode
+    /// according to the specification.
+    ///
+    /// # Bits
+    ///
+    /// - `0b00`: User mode
+    /// - `0b01`: Supervisor mode
+    /// - `0b11`: Machine mode
+    pub fn from_bits(bits: u8) -> Self {
+        match bits & 0b11 {
+            0b00 => PrivilegeMode::User,
+            0b01 => PrivilegeMode::Supervisor,
+            0b11 => PrivilegeMode::Machine,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Check if this privilege mode has higher privileges than the given mode.
+    pub fn can_access(self, other: PrivilegeMode) -> bool {
+        use PrivilegeMode::*;
+
+        match (self, other) {
+            (Machine, _) => true,
+            (Supervisor, Supervisor | User) => true,
+            (User, User) => true,
+            _ => false,
+        }
+    }
 }
 
 /// Representation of a single physical CPU.
@@ -107,6 +138,11 @@ impl Cpu {
     /// Return a reference to the underyling memory of this CPU.
     pub fn mem(&mut self) -> &mut Memory {
         &mut self.mem
+    }
+
+    /// Return the current privilege mode of this CPU.
+    pub fn mode(&self) -> PrivilegeMode {
+        self.mode
     }
 }
 
