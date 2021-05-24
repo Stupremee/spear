@@ -3,11 +3,10 @@
 
 use crate::{
     memory::Memory,
-    trap::{Exception, Result, Trap},
+    trap::{Exception, Result},
     Address, Architecture, Continuation, Extension, Instruction,
 };
 use bytemuck::Pod;
-use object::Object;
 
 /// Different privilege modes a CPU core can be in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,35 +71,6 @@ impl Cpu {
             arch,
             mem,
             mode: PrivilegeMode::Machine,
-        }
-    }
-
-    /// Create a CPU that will execute the given object file.
-    pub fn from_object(object: object::File<'_>) -> object::Result<Self> {
-        let mut arch = Architecture::rv32i();
-
-        // set the entry point
-        arch.base().set_pc((object.entry() as u32).into());
-
-        // load the file into memory
-        let mut mem = Memory::new();
-        mem.load_object(object)?;
-
-        Ok(Self::new(arch, mem))
-    }
-
-    /// Run this CPU until a `Fatal` trap got hit.
-    pub fn run(&mut self) -> Exception {
-        loop {
-            match self.step() {
-                Ok(_) => {}
-                Err(trap) => {
-                    println!("exception occurred: {:?}", trap);
-                    if let Trap::Fatal = trap.take_trap(self) {
-                        break trap;
-                    }
-                }
-            }
         }
     }
 

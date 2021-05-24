@@ -6,6 +6,7 @@ mod address;
 pub use address::{Address, AddressKind};
 
 pub mod cpu;
+pub mod emulator;
 pub mod extensions;
 pub mod memory;
 pub mod trap;
