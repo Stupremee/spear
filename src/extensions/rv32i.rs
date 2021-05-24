@@ -388,6 +388,8 @@ pub enum Instruction {
 
     #[display(fmt = "fence")]
     FENCE(IType),
+    #[display(fmt = "fence.i")]
+    FENCEI(IType),
     #[display(fmt = "ecall")]
     ECALL(IType),
     #[display(fmt = "ebreak")]

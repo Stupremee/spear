@@ -188,6 +188,7 @@ fn get_i_type(mut ty: IType, opcode: u8, funct3: u8) -> Option<Instruction> {
         (0b000_0011, 0b101) => Instruction::LHU(ty),
 
         (0b000_1111, 0b000) => Instruction::FENCE(ty),
+        (0b000_1111, 0b001) => Instruction::FENCEI(ty),
 
         (0b001_0011, 0b000) => Instruction::ADDI(ty),
         (0b001_0011, 0b010) => Instruction::SLTI(ty),

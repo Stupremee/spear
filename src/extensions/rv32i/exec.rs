@@ -6,7 +6,7 @@ use super::{Extension, Instruction, Register};
 use crate::{
     cpu,
     trap::{Exception, Result},
-    Address, Continuation,
+    Address, AddressKind, Continuation,
 };
 
 /// Execute a RV32I instruction on the given cpu.
@@ -65,14 +65,13 @@ pub fn exec(
         Instruction::BLTU(op) => return branch(ext, op, |a, b| a < b),
         Instruction::BGEU(op) => return branch(ext, op, |a, b| a >= b),
 
-        Instruction::LB(op) | Instruction::LBU(op) => {
-            load_inst::<u8, _>(op, cpu, |x| Address::from(x as u32))?;
+        Instruction::LBU(op) => load_inst::<u8, _>(op, cpu, |x| Address::from(x as u32))?,
+        Instruction::LB(op) => {
+            load_inst::<u8, _>(op, cpu, |x| Address::from(x as i8 as i32 as u32))?
         }
-        Instruction::LH(op) => load_inst::<u16, _>(op, cpu, |x| {
-            let x = x as u32 as i32;
-            let x = (x << 16) >> 16;
-            Address::from(x as u32)
-        })?,
+        Instruction::LH(op) => {
+            load_inst::<u16, _>(op, cpu, |x| Address::from(x as i16 as i32 as u32))?
+        }
         Instruction::LHU(op) => load_inst::<u16, _>(op, cpu, |x| Address::from(x as u32))?,
         Instruction::LW(op) => load_inst::<u32, _>(op, cpu, Address::from)?,
 
@@ -82,11 +81,11 @@ pub fn exec(
 
         Instruction::ADDI(op) => imm_inst(ext, op.rs, op.rd, |x| x + op.sign_imm() as u32),
         Instruction::SLTI(op) => imm_inst(ext, op.rs, op.rd, |x| {
-            if (u64::from(x) as i64) < op.sign_imm() as i64 {
-                1u32.into()
-            } else {
-                0u32.into()
-            }
+            let x = match x.kind() {
+                AddressKind::U32(x) => (x as i32) < op.sign_imm(),
+                AddressKind::U64(x) => (x as i32 as i64) < op.sign_imm() as i64,
+            };
+            (x as u32).into()
         }),
         Instruction::SLTIU(op) => imm_inst(ext, op.rs, op.rd, |x| {
             if u64::from(x) < op.sign_imm() as u32 as u64 {
@@ -136,6 +135,8 @@ pub fn exec(
         Instruction::AND(op) => reg_inst(ext, op, |a, b| a & b),
         // we are not real hardware, so we dont need fences
         Instruction::FENCE(_) => {}
+        // FIXME: flush icache of MMU
+        Instruction::FENCEI(_) => {}
         Instruction::ECALL(_) => match cpu.cpu().mode() {
             cpu::PrivilegeMode::User => return Err(Exception::UserEcall),
             cpu::PrivilegeMode::Supervisor => return Err(Exception::SupervisorEcall),
@@ -178,7 +179,7 @@ fn imm_inst<F: FnOnce(Address) -> Address>(ext: &mut Extension, rs: Register, rd
     ext.write_register(rd, op(src));
 }
 
-fn load_inst<T: Pod, F: FnOnce(T) -> Address>(
+fn load_inst<T: Pod + std::fmt::LowerHex, F: FnOnce(T) -> Address>(
     op: super::IType,
     mut cpu: cpu::CpuOrExtension<'_, Extension>,
     conv: F,

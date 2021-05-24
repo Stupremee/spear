@@ -54,7 +54,6 @@ impl Emulator {
             match self.cpu.step() {
                 Ok(_) => {}
                 Err(trap) => {
-                    println!("exception occurred: {:?}", trap);
                     if let Trap::Fatal = trap.take_trap(&mut self.cpu) {
                         break;
                     }
