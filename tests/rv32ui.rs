@@ -8,7 +8,7 @@ macro_rules! register_tests {
         $(#[test]
         fn $name() -> Result<(), Box<dyn std::error::Error>> {
             let mut root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-            root.push("tests/riscv-tests/isa");
+            root.push("tests/binaries");
             root.push(stringify!($name).replacen("_", "-", 2));
 
             let data = std::fs::read(root)?;
