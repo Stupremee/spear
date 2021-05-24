@@ -207,7 +207,7 @@ fn get_i_type(mut ty: IType, opcode: u8, funct3: u8) -> Option<Instruction> {
         (0b110_0111, 0b000) => Instruction::JALR(ty),
 
         (0b111_0011, 0b000) if ty.val == 0 => Instruction::ECALL(ty),
-        (0b111_0011, 0b000) if ty.val != 0 => Instruction::EBREAK(ty),
+        (0b111_0011, 0b000) if ty.val == 1 => Instruction::EBREAK(ty),
         _ => return None,
     };
     Some(inst)

@@ -89,8 +89,13 @@ impl crate::Extension for Extension {
 /// Type safe access for a X register.
 /// This type does not guarantee anything abuot the validity about the value inside.
 #[repr(transparent)]
-#[derive(Debug, From, Into, Clone, Copy)]
+#[derive(Debug, From, Into, Clone, Copy, PartialEq, Eq)]
 pub struct Register(u8);
+
+impl Register {
+    /// The `x0` register.
+    pub const ZERO: Register = Register(0);
+}
 
 impl fmt::Display for Register {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

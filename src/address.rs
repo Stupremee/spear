@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::ops;
+use std::ops::{self, Bound, Range, RangeBounds};
 
 /// Different representations of an address.
 #[derive(Debug, Clone, Copy)]
@@ -27,10 +27,87 @@ impl Address {
         }
     }
 
+    /// Take a new address and turn it into the same address kind as `self` by truncating or zero
+    /// extending the given address.
+    #[inline]
+    pub fn to_self_kind(&self, x: impl Into<Address>) -> Self {
+        match (self.kind(), x.into().kind()) {
+            (AddressKind::U64(_), AddressKind::U64(b)) => b.into(),
+            (AddressKind::U32(_), AddressKind::U32(b)) => b.into(),
+            (AddressKind::U64(_), AddressKind::U32(b)) => (b as u64).into(),
+            (AddressKind::U32(_), AddressKind::U64(b)) => (b as u32).into(),
+        }
+    }
+
     /// Get the inner representation of this address.
     #[inline]
     pub fn kind(self) -> AddressKind {
         self.0
+    }
+
+    /// Return the number of bits this address has.
+    #[inline]
+    pub fn bit_len(self) -> u32 {
+        match self.kind() {
+            AddressKind::U32(_) => 32,
+            AddressKind::U64(_) => 64,
+        }
+    }
+
+    /// Get the bit at the given index.
+    #[inline]
+    pub fn get_bit(&self, bit: u32) -> bool {
+        assert!(bit < self.bit_len());
+        (*self & (1u32 << bit)) != self.to_self_kind(0u32)
+    }
+
+    /// Set the bit at the given index to the given value.
+    #[inline]
+    pub fn set_bit(&mut self, bit: u32, val: bool) {
+        assert!(bit < self.bit_len());
+
+        if val {
+            *self = *self | self.to_self_kind(0u32) << bit;
+        } else {
+            *self = *self & !(self.to_self_kind(1u32) << bit);
+        }
+    }
+
+    /// Get all bits that belong into the given range.
+    #[inline]
+    pub fn get_bits<T: RangeBounds<u32>>(&self, range: T) -> Self {
+        let range = to_regular_range(&range, self.bit_len());
+
+        assert!(range.start < self.bit_len());
+        assert!(range.end <= self.bit_len());
+        assert!(range.start < range.end);
+
+        let bits = *self << (self.bit_len() - range.end) >> (self.bit_len() - range.end);
+        bits >> range.start
+    }
+
+    /// Set all bits that belong into the given range to the given value.
+    #[inline]
+    pub fn set_bits<T: RangeBounds<u32>>(&mut self, range: T, val: u64) -> Self {
+        let range = to_regular_range(&range, self.bit_len());
+
+        assert!(range.start < self.bit_len());
+        assert!(range.end <= self.bit_len());
+        assert!(range.start < range.end);
+        assert!(
+            val << (self.bit_len() - (range.end - range.start))
+                >> (self.bit_len() - (range.end - range.start))
+                == val,
+            "value does not fit into bit range"
+        );
+
+        let bitmask: Self = !(!self.to_self_kind(0u32) << (self.bit_len() - range.end)
+            >> (self.bit_len() - range.end)
+            >> range.start
+            << range.start);
+
+        *self = (*self & bitmask) | (val << range.start);
+        *self
     }
 }
 
@@ -306,3 +383,18 @@ impl_sign_op!(Div, div, wrapping_div);
 impl_sign_op!(BitAnd, bitand, bitand);
 impl_sign_op!(BitOr, bitor, bitor);
 impl_sign_op!(BitXor, bitxor, bitxor);
+
+fn to_regular_range<T: RangeBounds<u32>>(generic_rage: &T, bit_length: u32) -> Range<u32> {
+    let start = match generic_rage.start_bound() {
+        Bound::Excluded(&value) => value + 1,
+        Bound::Included(&value) => value,
+        Bound::Unbounded => 0,
+    };
+    let end = match generic_rage.end_bound() {
+        Bound::Excluded(&value) => value,
+        Bound::Included(&value) => value + 1,
+        Bound::Unbounded => bit_length,
+    };
+
+    start..end
+}

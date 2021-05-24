@@ -38,6 +38,15 @@ impl PrivilegeMode {
         }
     }
 
+    /// Turn this mode into the raw representation of bits according to the specification.
+    pub fn to_bits(self) -> u8 {
+        match self {
+            PrivilegeMode::User => 0b00,
+            PrivilegeMode::Supervisor => 0b01,
+            PrivilegeMode::Machine => 0b11,
+        }
+    }
+
     /// Check if this privilege mode has higher privileges than the given mode.
     pub fn can_access(self, other: PrivilegeMode) -> bool {
         use PrivilegeMode::*;
@@ -84,6 +93,7 @@ impl Cpu {
     /// it.
     pub fn step(&mut self) -> Result<()> {
         let pc = self.arch.base.get_pc();
+        println!("{:x}", u64::from(pc));
         let inst = self.mem.read::<u32>(pc)?;
 
         // check alignment of instruction
@@ -126,6 +136,16 @@ impl Cpu {
     /// Write a `T` to the given address.
     pub fn write<T: Pod>(&mut self, addr: Address, item: T) -> Result<()> {
         self.mem.write(addr, item)
+    }
+
+    /// Set the program counter to the given value.
+    pub fn set_pc(&mut self, pc: Address) {
+        self.arch.base.set_pc(pc);
+    }
+
+    /// Update the privilege mode to the given mode.
+    pub fn set_mode(&mut self, new: PrivilegeMode) {
+        self.mode = new;
     }
 
     /// Return a reference to the underyling architecture of this CPU.

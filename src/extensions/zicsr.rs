@@ -12,6 +12,7 @@ pub mod csr {
 use super::rv32i::IType;
 use crate::{
     cpu::{self, PrivilegeMode},
+    extensions::rv32i::Register,
     trap::{Exception, Result},
     Address, Continuation,
 };
@@ -35,9 +36,7 @@ impl Extension {
     }
 
     /// Try to write the given `val` to the CSR with the given index.
-    pub fn write_csr(&mut self, idx: usize, val: Address, mode: PrivilegeMode) -> Result<()> {
-        let csr = CsrAddress::try_new(idx).ok_or(Exception::IllegalInstruction)?;
-
+    pub fn write_csr(&mut self, csr: CsrAddress, val: Address, mode: PrivilegeMode) -> Result<()> {
         if !csr.writeable_in(mode) {
             return Err(Exception::IllegalInstruction);
         }
@@ -54,9 +53,7 @@ impl Extension {
     }
 
     /// Try to read a given CSR.
-    pub fn read_csr(&mut self, idx: usize, mode: PrivilegeMode) -> Result<Address> {
-        let csr = CsrAddress::try_new(idx).ok_or(Exception::IllegalInstruction)?;
-
+    pub fn read_csr(&self, csr: CsrAddress, mode: PrivilegeMode) -> Result<Address> {
         if !csr.readable_in(mode) {
             return Err(Exception::IllegalInstruction);
         }
@@ -82,6 +79,12 @@ pub fn parse(inst: u32) -> Option<Instruction> {
 
     let (funct3, ty) = IType::parse(inst);
     let inst = match funct3 {
+        0b000 if ty.val & 0x1F == 0b10 => match ty.val >> 5 {
+            0b00000 => Instruction::URET,
+            0b01000 => Instruction::SRET,
+            0b11000 => Instruction::MRET,
+            _ => return None,
+        },
         0b001 => Instruction::CSRRW,
         0b010 => Instruction::CSRRS,
         0b011 => Instruction::CSRRC,
@@ -110,6 +113,13 @@ pub enum Instruction {
     CSRRSI(IType),
     #[display(fmt = "csrrci {}", "_0")]
     CSRRCI(IType),
+
+    #[display(fmt = "uret")]
+    URET(IType),
+    #[display(fmt = "sret")]
+    SRET(IType),
+    #[display(fmt = "mret")]
+    MRET(IType),
 }
 
 impl crate::Instruction for Instruction {
@@ -127,12 +137,17 @@ impl crate::Instruction for Instruction {
             src: Address,
             op: IType,
             f: F,
+            write: bool,
         ) -> Result<()> {
+            let csr = CsrAddress::try_new(op.val as usize).ok_or(Exception::IllegalInstruction)?;
+
             let mode = cpu.mode();
             let ext = ext(cpu);
-            let old_csr = ext.read_csr(op.val as usize, mode)?;
+            let old_csr = ext.read_csr(csr, mode)?;
             let res = f(src, old_csr);
-            ext.write_csr(op.val as usize, res, mode)?;
+            if write {
+                ext.write_csr(csr, res, mode)?;
+            }
             base(cpu).write_register(op.rd, old_csr);
             Ok(())
         }
@@ -143,7 +158,8 @@ impl crate::Instruction for Instruction {
             f: F,
         ) -> Result<()> {
             let src = base(cpu).read_register(op.rs);
-            inst(cpu, src, op, f)?;
+            let write = op.rs != Register::ZERO;
+            inst(cpu, src, op, f, write)?;
             Ok(())
         }
 
@@ -153,7 +169,7 @@ impl crate::Instruction for Instruction {
             f: F,
         ) -> Result<()> {
             let src = u8::from(op.rs) as u32;
-            inst(cpu, src.into(), op, f)?;
+            inst(cpu, src.into(), op, f, true)?;
             Ok(())
         }
 
@@ -165,6 +181,33 @@ impl crate::Instruction for Instruction {
             Instruction::CSRRWI(op) => imm_inst(cpu, op, |src, _| src),
             Instruction::CSRRSI(op) => imm_inst(cpu, op, |src, old_csr| src | old_csr),
             Instruction::CSRRCI(op) => imm_inst(cpu, op, |src, old_csr| old_csr & !src),
+
+            Instruction::MRET(_) => {
+                if cpu.mode() != PrivilegeMode::Machine {
+                    return Err(Exception::IllegalInstruction);
+                }
+                let ext = ext(cpu);
+
+                let new_pc = ext.read_csr(csr::MEPC, PrivilegeMode::Machine)?;
+                let mut status = ext.read_csr(csr::MSTATUS, PrivilegeMode::Machine)?;
+
+                // extract the MPP field from `mstatus`
+                let mpp = status.get_bits(11..=12);
+
+                // set the new MIE field to the MPIE field
+                status.set_bit(3, status.get_bit(7));
+                // set the MPIE field to 1
+                status.set_bit(7, true);
+                // set the MPP field to U-mode
+                status.set_bits(11..=12, PrivilegeMode::User.to_bits() as u64);
+
+                ext.write_csr(csr::MSTATUS, status, PrivilegeMode::Machine)?;
+                cpu.set_pc(new_pc);
+                cpu.set_mode(PrivilegeMode::from_bits(u64::from(mpp) as u8));
+
+                Ok(())
+            }
+            _ => todo!(),
         }
         .map(|_| Continuation::Next)
     }

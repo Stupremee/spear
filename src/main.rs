@@ -12,7 +12,7 @@ fn main() {
     mem.write(2000u32.into(), 0xABu32).unwrap();
     mem.write(2004u32.into(), 0xCDu32).unwrap();
 
-    for _ in 0..10 {
+    for _ in 0..1000 {
         cpu.step().unwrap();
     }
     println!("{}", cpu.arch().base());

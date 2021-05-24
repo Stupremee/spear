@@ -136,7 +136,12 @@ pub fn exec(
         Instruction::AND(op) => reg_inst(ext, op, |a, b| a & b),
         // we are not real hardware, so we dont need fences
         Instruction::FENCE(_) => {}
-        _ => return Err(Exception::IllegalInstruction),
+        Instruction::ECALL(_) => match cpu.cpu().mode() {
+            cpu::PrivilegeMode::User => return Err(Exception::UserEcall),
+            cpu::PrivilegeMode::Supervisor => return Err(Exception::SupervisorEcall),
+            cpu::PrivilegeMode::Machine => return Err(Exception::MachineEcall),
+        },
+        Instruction::EBREAK(_) => todo!(),
     }
 
     Ok(Continuation::Next)
