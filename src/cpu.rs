@@ -3,7 +3,7 @@
 
 use crate::{
     memory::Memory,
-    trap::{Exception, Result},
+    trap::{Exception, Result, Trap},
     Address, Architecture, Continuation, Extension, Instruction,
 };
 use bytemuck::Pod;
@@ -89,11 +89,25 @@ impl Cpu {
         Ok(Self::new(arch, mem))
     }
 
+    /// Run this CPU until a `Fatal` trap got hit.
+    pub fn run(&mut self) -> Exception {
+        loop {
+            match self.step() {
+                Ok(_) => {}
+                Err(trap) => {
+                    println!("exception occurred: {:?}", trap);
+                    if let Trap::Fatal = trap.take_trap(self) {
+                        break trap;
+                    }
+                }
+            }
+        }
+    }
+
     /// Perfom one step inside the CPU, that will fetch an instrution, decode it, and then execute
     /// it.
     pub fn step(&mut self) -> Result<()> {
         let pc = self.arch.base.get_pc();
-        println!("{:x}", u64::from(pc));
         let inst = self.mem.read::<u32>(pc)?;
 
         // check alignment of instruction
@@ -124,7 +138,7 @@ impl Cpu {
         {
             Ok((inst.len(), inst.exec(self)?))
         } else {
-            Err(Exception::IllegalInstruction)
+            Err(Exception::IllegalInstruction(inst as u64))
         }
     }
 

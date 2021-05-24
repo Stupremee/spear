@@ -38,16 +38,12 @@ impl Extension {
     /// Try to write the given `val` to the CSR with the given index.
     pub fn write_csr(&mut self, csr: CsrAddress, val: Address, mode: PrivilegeMode) -> Result<()> {
         if !csr.writeable_in(mode) {
-            return Err(Exception::IllegalInstruction);
+            // FIXME: I think we need to insert something real here
+            return Err(Exception::IllegalInstruction(0));
         }
 
         let reg = &mut self.csrs[csr.0];
-        assert_eq!(
-            std::mem::discriminant(&val.kind()),
-            std::mem::discriminant(&reg.kind()),
-            "tried to store invalid address kind into CSR"
-        );
-        *reg = val;
+        *reg = reg.to_self_kind(val);
 
         Ok(())
     }
@@ -55,10 +51,22 @@ impl Extension {
     /// Try to read a given CSR.
     pub fn read_csr(&self, csr: CsrAddress, mode: PrivilegeMode) -> Result<Address> {
         if !csr.readable_in(mode) {
-            return Err(Exception::IllegalInstruction);
+            // FIXME: I think we need to insert something real here
+            return Err(Exception::IllegalInstruction(0));
         }
 
         Ok(self.csrs[csr.0])
+    }
+
+    /// Write the given `val` to the CSR with the given index, without checking permissions.
+    pub fn force_write_csr(&mut self, csr: CsrAddress, val: Address) {
+        let reg = &mut self.csrs[csr.0];
+        *reg = reg.to_self_kind(val);
+    }
+
+    /// Read a given CSR without checking permissions.
+    pub fn force_read_csr(&self, csr: CsrAddress) -> Address {
+        self.csrs[csr.0]
     }
 }
 
@@ -139,7 +147,8 @@ impl crate::Instruction for Instruction {
             f: F,
             write: bool,
         ) -> Result<()> {
-            let csr = CsrAddress::try_new(op.val as usize).ok_or(Exception::IllegalInstruction)?;
+            let csr =
+                CsrAddress::try_new(op.val as usize).ok_or(Exception::IllegalInstruction(0))?;
 
             let mode = cpu.mode();
             let ext = ext(cpu);
@@ -184,7 +193,7 @@ impl crate::Instruction for Instruction {
 
             Instruction::MRET(_) => {
                 if cpu.mode() != PrivilegeMode::Machine {
-                    return Err(Exception::IllegalInstruction);
+                    return Err(Exception::IllegalInstruction(0));
                 }
                 let ext = ext(cpu);
 

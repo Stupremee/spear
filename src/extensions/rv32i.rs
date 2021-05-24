@@ -2,7 +2,7 @@
 
 use crate::{cpu, trap, Address, Continuation};
 use derive_more::{Display, From, Into};
-use std::{fmt, mem::discriminant};
+use std::fmt;
 
 mod exec;
 pub use exec::exec;
@@ -41,14 +41,7 @@ impl Extension {
                 .registers
                 .get_mut(reg.0 as usize)
                 .expect("tried to access invalid register");
-
-            assert_eq!(
-                discriminant(&x.kind()),
-                discriminant(&reg.kind()),
-                "tried to store invalid address kind"
-            );
-
-            *reg = x;
+            *reg = reg.to_self_kind(x);
         }
     }
 

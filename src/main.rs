@@ -12,9 +12,7 @@ fn main() {
     mem.write(2000u32.into(), 0xABu32).unwrap();
     mem.write(2004u32.into(), 0xCDu32).unwrap();
 
-    for _ in 0..1000 {
-        cpu.step().unwrap();
-    }
+    cpu.run();
     println!("{}", cpu.arch().base());
 
     //println!("{:#x?}", mem.read::<u32>(0x8020_0000.into()));

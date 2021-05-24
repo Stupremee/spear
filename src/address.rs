@@ -30,7 +30,7 @@ impl Address {
     /// Take a new address and turn it into the same address kind as `self` by truncating or zero
     /// extending the given address.
     #[inline]
-    pub fn to_self_kind(&self, x: impl Into<Address>) -> Self {
+    pub fn to_self_kind(self, x: impl Into<Address>) -> Self {
         match (self.kind(), x.into().kind()) {
             (AddressKind::U64(_), AddressKind::U64(b)) => b.into(),
             (AddressKind::U32(_), AddressKind::U32(b)) => b.into(),
