@@ -172,8 +172,8 @@ fn get_r_type(ty: RType, funct3: u8, funct7: u8) -> Option<Instruction> {
         (0b100, 0b0000000) => Instruction::XOR(ty),
         (0b101, 0b0000000) => Instruction::SRL(ty),
         (0b101, 0b0100000) => Instruction::SRA(ty),
-        (0b110, 0b0100000) => Instruction::OR(ty),
-        (0b111, 0b0100000) => Instruction::AND(ty),
+        (0b110, 0b0000000) => Instruction::OR(ty),
+        (0b111, 0b0000000) => Instruction::AND(ty),
         _ => return None,
     };
     Some(inst)

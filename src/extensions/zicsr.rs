@@ -42,8 +42,16 @@ impl Extension {
             return Err(Exception::IllegalInstruction(0));
         }
 
-        let reg = &mut self.csrs[csr.0];
-        *reg = reg.to_self_kind(val);
+        match csr {
+            csr::SSTATUS => {
+                self.csrs[csr::MSTATUS.0] =
+                    (self.csrs[csr::MSTATUS.0] & !csr::SSTATUS_MASK) | (val & csr::SSTATUS_MASK)
+            }
+            csr => {
+                let reg = &mut self.csrs[csr.0];
+                *reg = reg.to_self_kind(val);
+            }
+        }
 
         Ok(())
     }
@@ -51,11 +59,15 @@ impl Extension {
     /// Try to read a given CSR.
     pub fn read_csr(&self, csr: CsrAddress, mode: PrivilegeMode) -> Result<Address> {
         if !csr.readable_in(mode) {
+            dbg!(mode);
             // FIXME: I think we need to insert something real here
             return Err(Exception::IllegalInstruction(0));
         }
 
-        Ok(self.csrs[csr.0])
+        match csr {
+            csr::SSTATUS => Ok(self.csrs[csr::MSTATUS.0] & csr::SSTATUS_MASK),
+            csr => Ok(self.csrs[csr.0]),
+        }
     }
 
     /// Write the given `val` to the CSR with the given index, without checking permissions.
@@ -214,7 +226,7 @@ impl crate::Instruction for Instruction {
                 cpu.set_pc(new_pc);
                 cpu.set_mode(PrivilegeMode::from_bits(u64::from(mpp) as u8));
 
-                Ok(())
+                return Ok(Continuation::Jump);
             }
             _ => todo!(),
         }

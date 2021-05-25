@@ -67,19 +67,6 @@ impl Exception {
         }
     }
 
-    fn epc(&self, pc: Address) -> Address {
-        match self {
-            Exception::Breakpoint
-            | Exception::UserEcall
-            | Exception::SupervisorEcall
-            | Exception::MachineEcall
-            | Exception::InstructionPageFault(..)
-            | Exception::LoadPageFault(..)
-            | Exception::StorePageFault(..) => pc,
-            _ => pc + 4u32,
-        }
-    }
-
     fn trap_value(&self, pc: Address) -> Address {
         match self {
             Exception::InstructionAddressMisaligned
@@ -100,7 +87,6 @@ impl Exception {
     /// Take this trap according to the exception kind.
     pub fn take_trap(self, cpu: &mut Cpu) -> Trap {
         let pc = cpu.arch().base.get_pc();
-        let old_pc = self.epc(pc);
         let tval = self.trap_value(pc);
         let prv_mode = cpu.mode();
         let cause = self.cause();
@@ -111,6 +97,7 @@ impl Exception {
                 .as_mut()
                 .expect("can not take trap if Zicsr extension is disabled")
         });
+        println!("taking trap: {:x?} epc: {:x?}", self, pc);
 
         if prv_mode.to_bits() <= PrivilegeMode::Supervisor.to_bits()
             && cpu.ext().force_read_csr(csr::MEDELEG).get_bit(cause)
@@ -125,12 +112,8 @@ impl Exception {
             let ext = cpu.ext();
 
             // write the old PC into `sepc` register
-            ext.force_write_csr(csr::SEPC, old_pc);
-
-            // write the cause to SCAUSE
+            ext.force_write_csr(csr::SEPC, pc);
             ext.force_write_csr(csr::SCAUSE, cause.into());
-
-            // write the tval to STVAL
             ext.force_write_csr(csr::STVAL, tval);
 
             // set the previous SPIE to the value of SIE and set SIE to 0
@@ -156,7 +139,7 @@ impl Exception {
 
             let ext = cpu.ext();
 
-            ext.force_write_csr(csr::MEPC, old_pc);
+            ext.force_write_csr(csr::MEPC, pc);
             ext.force_write_csr(csr::MCAUSE, cause.into());
             ext.force_write_csr(csr::MTVAL, tval);
 
@@ -168,7 +151,8 @@ impl Exception {
             // set MPP to the mode which took the trap
             status.set_bits(11..=12, prv_mode.to_bits() as u64);
 
-            ext.force_write_csr(csr::SSTATUS, status);
+            ext.force_write_csr(csr::MSTATUS, status);
+            println!("{:x?}", ext.force_read_csr(csr::MSTATUS));
         }
 
         match self {

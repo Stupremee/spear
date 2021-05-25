@@ -79,6 +79,7 @@ impl Cpu {
     pub fn step(&mut self) -> Result<()> {
         let pc = self.arch.base.get_pc();
         let inst = self.mem.read::<u32>(pc)?;
+        println!("{:#x?}", u64::from(pc));
 
         // check alignment of instruction
         if u64::from(pc) & 3 != 0 {

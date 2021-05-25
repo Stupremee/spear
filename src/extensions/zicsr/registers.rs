@@ -14,7 +14,7 @@ macro_rules! csr_addresses {
 }
 
 /// An index into the list of CSR inside the Zicsr extension.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct CsrAddress(pub(super) usize);
 
@@ -45,6 +45,10 @@ impl CsrAddress {
         mode.can_access(x)
     }
 }
+
+/// This bit mask can be applied to the MSTATUS register, to get all bits that are valid in the
+/// SSTATUS register.
+pub const SSTATUS_MASK: u64 = 0x80000003000de162;
 
 #[rustfmt::skip]
 csr_addresses![

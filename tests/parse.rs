@@ -64,6 +64,9 @@ test_instructions! { rv32i,
     test_addi_inst {
         0x03848493: "addi s1, s1, 56",
     }
+    test_and_inst {
+        0x0053f3b3: "and t2, t2, t0",
+    }
     test_slli_inst {
         0x00499593: "slli a1, s3, 4",
     }
