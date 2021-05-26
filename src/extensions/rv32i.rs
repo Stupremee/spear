@@ -186,7 +186,7 @@ impl IType {
     /// Get the shift amount of this I-type.
     #[inline]
     pub fn shamt(&self) -> u8 {
-        (self.val & 0x1F) as u8
+        (self.val & 0x3F) as u8
     }
 }
 

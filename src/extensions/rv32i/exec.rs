@@ -97,12 +97,21 @@ pub fn exec(
         Instruction::XORI(op) => imm_inst(ext, op.rs, op.rd, |x| x ^ op.sign_imm() as u32),
         Instruction::ORI(op) => imm_inst(ext, op.rs, op.rd, |x| x | op.sign_imm() as u32),
         Instruction::ANDI(op) => imm_inst(ext, op.rs, op.rd, |x| x & op.sign_imm() as u32),
-        Instruction::SLLI(op) => imm_inst(ext, op.rs, op.rd, |x| x << op.shamt() as u32),
-        Instruction::SRLI(op) => imm_inst(ext, op.rs, op.rd, |x| x >> op.shamt() as u32),
-        Instruction::SRAI(op) => imm_inst(ext, op.rs, op.rd, |x| {
-            let x = x.signed() >> op.shamt() as u32;
-            x.unsigned()
-        }),
+        Instruction::SLLI(op) => {
+            verify_shamt(cpu.cpu(), op.shamt())?;
+            imm_inst(cpu.ext(), op.rs, op.rd, |x| x << op.shamt() as u32)
+        }
+        Instruction::SRLI(op) => {
+            verify_shamt(cpu.cpu(), op.shamt())?;
+            imm_inst(cpu.ext(), op.rs, op.rd, |x| x >> op.shamt() as u32)
+        }
+        Instruction::SRAI(op) => {
+            verify_shamt(cpu.cpu(), op.shamt())?;
+            imm_inst(cpu.ext(), op.rs, op.rd, |x| {
+                let x = x.signed() >> op.shamt() as u32;
+                x.unsigned()
+            })
+        }
 
         Instruction::ADD(op) => reg_inst(ext, op, |a, b| a + b),
         Instruction::SUB(op) => reg_inst(ext, op, |a, b| a - b),
@@ -201,4 +210,12 @@ fn store_inst<T: Pod, F: FnOnce(u64) -> T>(
 
     cpu.cpu().write(addr, value)?;
     Ok(())
+}
+
+fn verify_shamt(cpu: &mut cpu::Cpu, x: u8) -> Result<()> {
+    if x >= cpu.arch().xlen as u8 {
+        Err(Exception::IllegalInstruction(0))
+    } else {
+        Ok(())
+    }
 }

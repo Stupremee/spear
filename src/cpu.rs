@@ -138,7 +138,6 @@ impl Cpu {
         }
 
         let mut pending = zicsr.force_read_csr(csr::MIE) & zicsr.force_read_csr(csr::MIP);
-        println!("{:x?}", pending);
         let (bit, int) = if pending.get_bit(11) {
             // MEIP bit
             (11, Interrupt::MachineExternalInterrupt)

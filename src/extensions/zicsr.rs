@@ -30,15 +30,23 @@ pub struct Extension {
 impl Extension {
     /// Create a new `Zicsr` extension that will store 32-bit wide CSR.
     pub fn new_32bit() -> Self {
-        Self {
+        let mut this = Self {
             csrs: Box::new([Address::from(0u32); CSR_COUNT]),
-        }
+        };
+
+        // FIXME: Generate `misa` from architecture
+        let misa: u64 = (1 << 30) |
+            (1 << 20) | // Extensions[20]: (User mode implemented)
+            (1 << 18) | // Extensions[18]: (Supervisor mode implemented)
+            (1 << 8); // Extensions[8] (RV32I/64I/128I base ISA)
+
+        this.force_write_csr(csr::MISA, misa.into());
+        this
     }
 
     /// Try to write the given `val` to the CSR with the given index.
     pub fn write_csr(&mut self, csr: CsrAddress, val: Address, mode: PrivilegeMode) -> Result<()> {
         if !csr.writeable_in(mode) {
-            // FIXME: I think we need to insert something real here
             return Err(Exception::IllegalInstruction(0));
         }
 
@@ -59,12 +67,12 @@ impl Extension {
     /// Try to read a given CSR.
     pub fn read_csr(&self, csr: CsrAddress, mode: PrivilegeMode) -> Result<Address> {
         if !csr.readable_in(mode) {
-            // FIXME: I think we need to insert something real here
             return Err(Exception::IllegalInstruction(0));
         }
 
         match csr {
             csr::SSTATUS => Ok(self.csrs[csr::MSTATUS.0] & csr::SSTATUS_MASK),
+            csr::CYCLE => Ok(dbg!(self.csrs[csr.0])),
             csr => Ok(self.csrs[csr.0]),
         }
     }
@@ -174,6 +182,7 @@ impl crate::Instruction for Instruction {
             if write {
                 ext.write_csr(csr, res, mode)?;
             }
+            println!("writing {:x?} to {}", old_csr, op.rd);
             base(cpu).write_register(op.rd, old_csr);
             Ok(())
         }
