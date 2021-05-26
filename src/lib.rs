@@ -20,6 +20,8 @@ pub enum Continuation {
     /// This was a "normal" instruction and the PC can be increased normally to point to the next
     /// instruction.
     Next,
+    /// This was a WFI instruction and the CPU should halt now.
+    WaitForInterrupt,
 }
 
 /// Trait for representing an extension-independent instruction.
@@ -48,6 +50,7 @@ pub trait Extension {
 pub struct Architecture {
     pub(crate) base: extensions::rv32i::Extension,
     pub(crate) zicsr: Option<extensions::zicsr::Extension>,
+    pub(crate) xlen: usize,
 }
 
 impl Architecture {
@@ -56,6 +59,7 @@ impl Architecture {
         Self {
             base: extensions::rv32i::Extension::new_32bit(),
             zicsr: Some(extensions::zicsr::Extension::new_32bit()),
+            xlen: 32,
         }
     }
 

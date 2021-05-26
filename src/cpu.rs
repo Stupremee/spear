@@ -2,8 +2,9 @@
 //! RISC-V code.
 
 use crate::{
+    extensions::zicsr::csr,
     memory::Memory,
-    trap::{Exception, Result},
+    trap::{Exception, Interrupt, Result},
     Address, Architecture, Continuation, Extension, Instruction,
 };
 use bytemuck::Pod;
@@ -77,6 +78,10 @@ impl Cpu {
     /// Perfom one step inside the CPU, that will fetch an instrution, decode it, and then execute
     /// it.
     pub fn step(&mut self) -> Result<()> {
+        if let Some(int) = self.check_pending_interrupt() {
+            int.take_trap(self);
+        }
+
         let pc = self.arch.base.get_pc();
         let inst = self.mem.read::<u32>(pc)?;
         println!("{:#x?}", u64::from(pc));
@@ -91,6 +96,9 @@ impl Cpu {
 
         match c {
             Continuation::Next => self.arch.base.set_pc(new_pc),
+            // WFI is implemeted by just executing the `wfi` instruction over and over again.
+            // This is really expensive but it's simple and it works
+            Continuation::WaitForInterrupt => self.arch.base.set_pc(pc),
             Continuation::Jump => {}
         }
 
@@ -111,6 +119,50 @@ impl Cpu {
         } else {
             Err(Exception::IllegalInstruction(inst as u64))
         }
+    }
+
+    fn check_pending_interrupt(&self) -> Option<Exception> {
+        let zicsr = self.arch.zicsr.as_ref()?;
+
+        // first, check if interrupts are globally enabled
+        let status = match self.mode() {
+            PrivilegeMode::Machine => Some((zicsr.force_read_csr(csr::MSTATUS), 3)),
+            PrivilegeMode::Supervisor => Some((zicsr.force_read_csr(csr::SSTATUS), 1)),
+            _ => None,
+        };
+
+        if let Some((status, ie_bit)) = status {
+            if !status.get_bit(ie_bit) {
+                return None;
+            }
+        }
+
+        let mut pending = zicsr.force_read_csr(csr::MIE) & zicsr.force_read_csr(csr::MIP);
+        println!("{:x?}", pending);
+        let (bit, int) = if pending.get_bit(11) {
+            // MEIP bit
+            (11, Interrupt::MachineExternalInterrupt)
+        } else if pending.get_bit(7) {
+            // MTIP bit
+            (7, Interrupt::MachineTimerInterrupt)
+        } else if pending.get_bit(3) {
+            // MSIP bit
+            (3, Interrupt::MachineSoftwareInterrupt)
+        } else if pending.get_bit(9) {
+            // SEIP bit
+            (9, Interrupt::SupervisorExternalInterrupt)
+        } else if pending.get_bit(7) {
+            // STIP bit
+            (5, Interrupt::SupervisorTimerInterrupt)
+        } else if pending.get_bit(1) {
+            // SSIP bit
+            (1, Interrupt::SupervisorSoftwareInterrupt)
+        } else {
+            return None;
+        };
+        pending.set_bit(bit, false);
+
+        Some(Exception::Interrupt(int))
     }
 
     /// Read a `T` from the given address.

@@ -59,7 +59,6 @@ impl Extension {
     /// Try to read a given CSR.
     pub fn read_csr(&self, csr: CsrAddress, mode: PrivilegeMode) -> Result<Address> {
         if !csr.readable_in(mode) {
-            dbg!(mode);
             // FIXME: I think we need to insert something real here
             return Err(Exception::IllegalInstruction(0));
         }
@@ -105,6 +104,10 @@ pub fn parse(inst: u32) -> Option<Instruction> {
             0b11000 => Instruction::MRET,
             _ => return None,
         },
+        0b000 if ty.val & 0x1F == 0b101 => match ty.val >> 5 {
+            0b01000 => Instruction::WFI,
+            _ => return None,
+        },
         0b001 => Instruction::CSRRW,
         0b010 => Instruction::CSRRS,
         0b011 => Instruction::CSRRC,
@@ -140,6 +143,8 @@ pub enum Instruction {
     SRET(IType),
     #[display(fmt = "mret")]
     MRET(IType),
+    #[display(fmt = "wfi")]
+    WFI(IType),
 }
 
 impl crate::Instruction for Instruction {
@@ -203,6 +208,7 @@ impl crate::Instruction for Instruction {
             Instruction::CSRRSI(op) => imm_inst(cpu, op, |src, old_csr| src | old_csr),
             Instruction::CSRRCI(op) => imm_inst(cpu, op, |src, old_csr| old_csr & !src),
 
+            Instruction::WFI(_) => return Ok(Continuation::WaitForInterrupt),
             Instruction::MRET(_) => {
                 if cpu.mode() != PrivilegeMode::Machine {
                     return Err(Exception::IllegalInstruction(0));

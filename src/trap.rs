@@ -8,7 +8,7 @@ use crate::Address;
 pub type Result<T> = std::result::Result<T, Exception>;
 
 /// This enum represents the kind of an exception, and how it should be handled.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Trap {
     /// The trap is visible to, and handled by, software running inside the execution
     /// environment.
@@ -22,6 +22,39 @@ pub enum Trap {
     /// The trap represents a fatal failure and causes the execution environment to terminate
     /// execution.
     Fatal,
+}
+
+/// All the interrupt kinds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(missing_docs)]
+pub enum Interrupt {
+    UserSoftwareInterrupt,
+    SupervisorSoftwareInterrupt,
+    MachineSoftwareInterrupt,
+
+    UserTimerInterrupt,
+    SupervisorTimerInterrupt,
+    MachineTimerInterrupt,
+
+    UserExternalInterrupt,
+    SupervisorExternalInterrupt,
+    MachineExternalInterrupt,
+}
+
+impl Interrupt {
+    fn cause(self) -> u32 {
+        match self {
+            Interrupt::UserSoftwareInterrupt => 0,
+            Interrupt::SupervisorSoftwareInterrupt => 1,
+            Interrupt::MachineSoftwareInterrupt => 3,
+            Interrupt::UserTimerInterrupt => 4,
+            Interrupt::SupervisorTimerInterrupt => 5,
+            Interrupt::MachineTimerInterrupt => 7,
+            Interrupt::UserExternalInterrupt => 8,
+            Interrupt::SupervisorExternalInterrupt => 9,
+            Interrupt::MachineExternalInterrupt => 11,
+        }
+    }
 }
 
 /// All the exception kinds.
@@ -45,6 +78,8 @@ pub enum Exception {
     InstructionPageFault(Address),
     LoadPageFault(Address),
     StorePageFault(Address),
+
+    Interrupt(Interrupt),
 }
 
 impl Exception {
@@ -64,6 +99,7 @@ impl Exception {
             Exception::InstructionPageFault(..) => 12,
             Exception::LoadPageFault(..) => 13,
             Exception::StorePageFault(..) => 15,
+            Exception::Interrupt(int) => int.cause(),
         }
     }
 
@@ -91,6 +127,9 @@ impl Exception {
         let prv_mode = cpu.mode();
         let cause = self.cause();
 
+        let int_bit = matches!(self, Exception::Interrupt(..)) as u32;
+        let int_bit = int_bit << (cpu.arch().xlen - 1);
+
         let mut cpu = CpuOrExtension::new(cpu, |cpu| {
             cpu.arch()
                 .zicsr
@@ -99,21 +138,33 @@ impl Exception {
         });
         println!("taking trap: {:x?} epc: {:x?}", self, pc);
 
+        let deleg = if matches!(self, Exception::Interrupt(_)) {
+            csr::MIDELEG
+        } else {
+            csr::MEDELEG
+        };
+
         if prv_mode.to_bits() <= PrivilegeMode::Supervisor.to_bits()
-            && cpu.ext().force_read_csr(csr::MEDELEG).get_bit(cause)
+            && cpu.ext().force_read_csr(deleg).get_bit(cause)
         {
             // handle the trap in S-mode
             cpu.cpu().set_mode(PrivilegeMode::Supervisor);
 
             // read the address of the trap handler
-            let trap_pc = cpu.ext().force_read_csr(csr::STVEC) >> 1 << 1;
-            cpu.cpu().set_pc(trap_pc);
+            let tvec = cpu.ext().force_read_csr(csr::STVEC);
+            let trap_pc = tvec >> 1 << 1;
+            let vector = match tvec.get_bit(0) {
+                true => 4 * cause,
+                false => 0,
+            };
+
+            cpu.cpu().set_pc(trap_pc + vector);
 
             let ext = cpu.ext();
 
             // write the old PC into `sepc` register
             ext.force_write_csr(csr::SEPC, pc);
-            ext.force_write_csr(csr::SCAUSE, cause.into());
+            ext.force_write_csr(csr::SCAUSE, (cause | int_bit).into());
             ext.force_write_csr(csr::STVAL, tval);
 
             // set the previous SPIE to the value of SIE and set SIE to 0
@@ -134,13 +185,19 @@ impl Exception {
             cpu.cpu().set_mode(PrivilegeMode::Machine);
 
             // read the address of the trap handler
-            let trap_pc = cpu.ext().force_read_csr(csr::MTVEC) >> 1 << 1;
-            cpu.cpu().set_pc(trap_pc);
+            let tvec = cpu.ext().force_read_csr(csr::MTVEC);
+            let trap_pc = tvec >> 1 << 1;
+            let vector = match tvec.get_bit(0) {
+                true => 4 * cause,
+                false => 0,
+            };
+
+            cpu.cpu().set_pc(trap_pc + vector);
 
             let ext = cpu.ext();
 
             ext.force_write_csr(csr::MEPC, pc);
-            ext.force_write_csr(csr::MCAUSE, cause.into());
+            ext.force_write_csr(csr::MCAUSE, (cause | int_bit).into());
             ext.force_write_csr(csr::MTVAL, tval);
 
             // set the previous MPIE to the value of MIE and set MIE to 0
@@ -152,7 +209,6 @@ impl Exception {
             status.set_bits(11..=12, prv_mode.to_bits() as u64);
 
             ext.force_write_csr(csr::MSTATUS, status);
-            println!("{:x?}", ext.force_read_csr(csr::MSTATUS));
         }
 
         match self {
@@ -169,6 +225,7 @@ impl Exception {
             | Exception::MachineEcall => Trap::Requested,
 
             Exception::IllegalInstruction(_)
+            | Exception::Interrupt(_)
             | Exception::InstructionPageFault(_)
             | Exception::LoadPageFault(_)
             | Exception::StorePageFault(_) => Trap::Invisible,
