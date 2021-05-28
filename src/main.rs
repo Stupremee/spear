@@ -2,8 +2,22 @@ use object::File;
 use spear::emulator::Emulator;
 
 fn main() {
-    env_logger::builder()
-        .parse_filters("RUST_LOG")
+    init_logger();
+
+    let obj = std::fs::read(std::env::args().nth(1).unwrap()).unwrap();
+    let obj = File::parse(obj.as_slice()).unwrap();
+    let mut emu = Emulator::from_object_with_htif(obj).unwrap();
+
+    emu.run();
+    log::info!("{}", emu.cpu().arch().base());
+}
+
+fn init_logger() {
+    use env_logger::Env;
+
+    let env = Env::default().filter_or("SPEAR_LOG", "info");
+
+    env_logger::Builder::from_env(env)
         .format(|f, record| {
             use env_logger::fmt;
             use std::io::Write;
@@ -27,14 +41,4 @@ fn main() {
             writeln!(f, "{} > {}", level, record.args())
         })
         .init();
-
-    let obj = std::fs::read(std::env::args().nth(1).unwrap()).unwrap();
-    let obj = File::parse(obj.as_slice()).unwrap();
-    let mut emu = Emulator::from_object_with_htif(obj).unwrap();
-
-    emu.run();
-    log::info!("{}", emu.cpu().arch().base());
-
-    //println!("{:#x?}", mem.read::<u32>(0x8020_0000.into()));
-    // 97 91 01 00
 }

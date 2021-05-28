@@ -18,3 +18,4 @@ test.S
 test.lds
 
 /.vim
+/example/hello

@@ -29,6 +29,7 @@ pkgs.mkShell {
     spike
     autoconf
     hexyl
+    python38Packages.grip
 
     pkgsRiscv.buildPackages.gcc
   ];

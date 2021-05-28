@@ -44,6 +44,11 @@ impl Emulator {
 
     /// Run this emulator until a `Fatal` trap gets hit or something is written to `tohost`.
     pub fn run(&mut self) {
+        // we set `tohost` to zero at the beginning, to see every write that occurrs.
+        if let Some(addr) = self.tohost_addr {
+            let _ = self.cpu.write::<u32>(addr, 0u32);
+        }
+
         loop {
             if let Some(addr) = self.tohost_addr {
                 if self.cpu.read::<u32>(addr).map_or(false, |x| x != 0) {
