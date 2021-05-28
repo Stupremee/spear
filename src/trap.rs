@@ -151,7 +151,7 @@ impl Exception {
             ext.force_write_csr(csr::STVAL, tval);
 
             // set the previous SPIE to the value of SIE and set SIE to 0
-            let mut status = ext.force_read_csr(csr::SSTATUS);
+            let mut status = ext.force_read_csr(csr::MSTATUS);
             status.set_bit(5, status.get_bit(1));
             status.set_bit(1, false);
 
@@ -162,7 +162,7 @@ impl Exception {
                 _ => unreachable!(),
             }
 
-            ext.force_write_csr(csr::SSTATUS, status);
+            ext.force_write_csr(csr::MSTATUS, status);
         } else {
             // handle the trap in M-mode
             cpu.cpu().set_mode(PrivilegeMode::Machine);

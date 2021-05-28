@@ -67,7 +67,7 @@ impl Address {
         assert!(bit < self.bit_len());
 
         if val {
-            *self = *self | self.to_self_kind(0u32) << bit;
+            *self = *self | self.to_self_kind(1u32) << bit;
         } else {
             *self = *self & !(self.to_self_kind(1u32) << bit);
         }

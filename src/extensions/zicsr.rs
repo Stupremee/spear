@@ -276,6 +276,10 @@ impl crate::Instruction for Instruction {
 
                 ext.write_csr(csr::MSTATUS, status, PrivilegeMode::Machine)?;
                 cpu.set_pc(new_pc);
+                println!(
+                    "mret: going into {:?}",
+                    PrivilegeMode::from_bits(u64::from(mpp) as u8)
+                );
                 cpu.set_mode(PrivilegeMode::from_bits(u64::from(mpp) as u8));
 
                 return Ok(Continuation::Jump);
@@ -291,7 +295,7 @@ impl crate::Instruction for Instruction {
                 let ext = ext(cpu);
 
                 let new_pc = ext.read_csr(csr::SEPC, PrivilegeMode::Supervisor)?;
-                let mut status = ext.read_csr(csr::SSTATUS, PrivilegeMode::Supervisor)?;
+                let mut status = ext.force_read_csr(csr::MSTATUS);
 
                 // extract the SPP field from `sstatus`
                 let mpp = status.get_bit(8);
@@ -303,9 +307,13 @@ impl crate::Instruction for Instruction {
                 // set the SPP field to U-mode
                 status.set_bit(8, false);
 
-                ext.write_csr(csr::SSTATUS, status, PrivilegeMode::Supervisor)?;
+                ext.force_write_csr(csr::MSTATUS, status);
                 cpu.set_pc(new_pc);
                 cpu.set_mode(PrivilegeMode::from_bits(u64::from(mpp) as u8));
+                println!(
+                    "sret: going into {:?}",
+                    PrivilegeMode::from_bits(u64::from(mpp) as u8)
+                );
 
                 return Ok(Continuation::Jump);
             }

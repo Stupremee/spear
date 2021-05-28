@@ -31,17 +31,15 @@ macro_rules! register_test_suite {
 
 register_test_suite![ rv32mi_p =>
     // who needs breakpoints anyway
-    // rv32mi_p_breakpoint,
+    // breakpoint,
 
     // FIXME: Compares cycle count which is not implemented yet
-    // rv32mi_p_csr,
-
-    // FIXME: this test currently fails
-    illegal,
+    // csr,
 
     // `EBREAK` is not yet implemented
-    // rv32mi_p_sbreak,
+    // sbreak,
 
+    illegal,
     scall,
     shamt,
     ma_addr,
@@ -49,16 +47,17 @@ register_test_suite![ rv32mi_p =>
     mcsr,
 ];
 
-//register_test_suite![ rv32si_p =>
-//// `EBREAK` is not yet implemented
-//// sbreak,
+register_test_suite![ rv32si_p =>
+    // `EBREAK` is not yet implemented
+    // sbreak,
+    // FIXME: Requires virtual memory
+    // dirty,
 
-//csr,
-//dirty,
-//ma_fetch,
-//scall,
-//wfi,
-//];
+    csr,
+    ma_fetch,
+    scall,
+    wfi,
+];
 
 register_test_suite![ rv32ui_p =>
     add,
