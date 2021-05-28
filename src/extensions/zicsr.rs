@@ -218,7 +218,6 @@ impl crate::Instruction for Instruction {
             if write {
                 ext.write_csr(csr, res, mode)?;
             }
-            println!("writing {:x?} to {}", old_csr, op.rd);
             base(cpu).write_register(op.rd, old_csr);
             Ok(())
         }
@@ -276,11 +275,10 @@ impl crate::Instruction for Instruction {
 
                 ext.write_csr(csr::MSTATUS, status, PrivilegeMode::Machine)?;
                 cpu.set_pc(new_pc);
-                println!(
-                    "mret: going into {:?}",
-                    PrivilegeMode::from_bits(u64::from(mpp) as u8)
-                );
-                cpu.set_mode(PrivilegeMode::from_bits(u64::from(mpp) as u8));
+
+                let mode = PrivilegeMode::from_bits(u64::from(mpp) as u8);
+                cpu.set_mode(mode);
+                log::debug!("mret: jumping to {} in {:?} mode", new_pc, mode);
 
                 return Ok(Continuation::Jump);
             }
@@ -309,11 +307,10 @@ impl crate::Instruction for Instruction {
 
                 ext.force_write_csr(csr::MSTATUS, status);
                 cpu.set_pc(new_pc);
-                cpu.set_mode(PrivilegeMode::from_bits(u64::from(mpp) as u8));
-                println!(
-                    "sret: going into {:?}",
-                    PrivilegeMode::from_bits(u64::from(mpp) as u8)
-                );
+
+                let mode = PrivilegeMode::from_bits(u64::from(mpp) as u8);
+                cpu.set_mode(mode);
+                log::debug!("sret: jumping to {} in {:?} mode", new_pc, mode);
 
                 return Ok(Continuation::Jump);
             }
@@ -325,7 +322,7 @@ impl crate::Instruction for Instruction {
                     return Err(Exception::IllegalInstruction(0));
                 }
 
-                println!("executing sfence.vma which is a nop currently");
+                log::warn!("tried to execute sfence.vma, which is a nop currently");
                 Ok(())
             }
             Instruction::URET(_) => todo!(),

@@ -58,11 +58,11 @@ impl Extension {
 
 impl fmt::Display for Extension {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "pc: {:#x?}", u64::from(self.pc))?;
+        write!(f, "pc: {:#x?} ", u64::from(self.pc))?;
         for reg in 0..32 {
-            writeln!(
+            write!(
                 f,
-                "{}: {:#x?}",
+                "{}: {:#x?} ",
                 Register::from(reg),
                 u64::from(self.registers[reg as usize])
             )?;

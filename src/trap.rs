@@ -3,6 +3,7 @@
 use crate::cpu::{Cpu, CpuOrExtension, PrivilegeMode};
 use crate::extensions::zicsr::csr;
 use crate::Address;
+use log::debug;
 
 /// The result type used for everything that can throw a trap.
 pub type Result<T> = std::result::Result<T, Exception>;
@@ -119,7 +120,8 @@ impl Exception {
                 .as_mut()
                 .expect("can not take trap if Zicsr extension is disabled")
         });
-        println!("taking trap: {:x?} epc: {:x?}", self, pc);
+
+        debug!("taking trap {:x?} from {}", self, pc);
 
         let deleg = if matches!(self, Exception::Interrupt(_)) {
             csr::MIDELEG

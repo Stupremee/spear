@@ -31,4 +31,4 @@ of the emulator and it's execution.
 [spike]: https://github.com/riscv/riscv-isa-sim
 [WASM]: https://webassembly.org/
 [riscv-arch-test]: https://github.com/riscv/riscv-arch-test
-[risof]: https://gitlab.com/incoresemi/riscof/
+[riscof]: https://gitlab.com/incoresemi/riscof/

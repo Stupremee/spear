@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::fmt;
 use std::ops::{self, Bound, Range, RangeBounds};
 
 /// Different representations of an address.
@@ -16,6 +17,15 @@ pub enum AddressKind {
 /// bit addresses.
 #[derive(Debug, Clone, Copy)]
 pub struct Address(AddressKind);
+
+impl fmt::Display for Address {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.kind() {
+            AddressKind::U32(x) => write!(f, "{:#x?}", x),
+            AddressKind::U64(x) => write!(f, "{:#x?}", x),
+        }
+    }
+}
 
 impl Address {
     /// Convert this value into a signed value.

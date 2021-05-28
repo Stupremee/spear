@@ -8,16 +8,10 @@ edition = "2018"
 [dependencies]
 bytemuck = "1.5"
 object = "0.24"
+log = "0.4"
+env_logger = "0.8"
 
 [dependencies.derive_more]
 version = "0.99"
 default-features = false
 features = ["display", "from", "into"]
-
-[package.metadata.nix]
-# Toggle app flake output
-app = true
-# Toggle flake outputs that build (checks, package and app)
-build = true
-# Whether to copy built library to package output
-library = false

@@ -8,6 +8,7 @@ use crate::{
     Address, Architecture, Continuation, Extension, Instruction,
 };
 use bytemuck::Pod;
+use log::trace;
 
 /// Different privilege modes a CPU core can be in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,18 +85,6 @@ impl Cpu {
 
         let pc = self.arch.base.get_pc();
         let inst = self.mem.read::<u32>(pc)?;
-        println!(
-            "{:#x?} gp {:#x?}",
-            u64::from(pc),
-            u64::from(self.arch.base.read_register(3.into()))
-        );
-
-        if u64::from(pc) == 0x80000204 {
-            println!(
-                "mip {:x?}",
-                self.arch.zicsr.as_ref().unwrap().force_read_csr(csr::MIP)
-            );
-        }
 
         // check alignment of instruction
         if u64::from(pc) & 3 != 0 {
@@ -116,6 +105,7 @@ impl Cpu {
     // FIXME: Write macro or something else to make this better.
     fn parse_and_exec(&mut self, inst: u32) -> Result<(u32, Continuation)> {
         if let Some(inst) = self.arch.base.parse_instruction(inst) {
+            trace!("executing {}: {}", self.arch.base.get_pc(), inst);
             Ok((inst.len(), inst.exec(self)?))
         } else if let Some(inst) = self
             .arch
@@ -123,6 +113,7 @@ impl Cpu {
             .as_ref()
             .and_then(|ext| ext.parse_instruction(inst))
         {
+            trace!("executing {}: {}", self.arch.base.get_pc(), inst);
             Ok((inst.len(), inst.exec(self)?))
         } else {
             Err(Exception::IllegalInstruction(inst as u64))
