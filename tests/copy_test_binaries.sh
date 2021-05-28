@@ -1,11 +1,11 @@
 #!/usr/bin/env sh
 
 function copy_suite() {
-  files=$(fd --no-ignore "$1-[a-z_]+$" tests/riscv-tests/isa)
+  files=$(fd --no-ignore "$1-[a-z_]+$" riscv-tests/isa)
 
-  mkdir -p tests/binaries/$1
+  mkdir -p binaries/$1
   for file in $files; do
-    cp $file tests/binaries/$1
+    cp $file binaries/$1
   done
 }
 
