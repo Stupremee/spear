@@ -29,6 +29,8 @@ much hassle.
 Support for all rattified extensions is planned, and important other extensions, like the V
 extension will also come to play with cool new features.
 
+Extension roadmap:
+
 - [ ] Base
   - [x] RV32I v2.1
   - [ ] RV64I v2.1
@@ -60,7 +62,8 @@ Install the latest spear version from `main` branch by running the following com
 cargo install --locked --git https://github.com/Stupremee/spear
 ```
 
-Now you can run `spike`! :tada:
+Now you can run `spear`! :tada:
+
 You can take a look at the [example](https://github.com/Stupremee/spear/tree/main/example).
 It contains the `hello.S` assembly file and the `link.lds` which is used to compile the `hello.S`
 file. To compile the and run `hello.S` file, run the following commands (on NixOS the prefix is `riscv32-none-elf`,
