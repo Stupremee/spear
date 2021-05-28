@@ -53,6 +53,8 @@ left to fix.
 
 ## Usage
 
+Spear currently requires at least the latest beta version (1.53.0-beta.3) of the Rust compiler.
+
 Install the latest spear version from `main` branch by running the following command.
 ```sh
 cargo install --locked --git https://github.com/Stupremee/spear
