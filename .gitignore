@@ -11,3 +11,10 @@
 /.envrc
 
 /target
+
+# Files for local testing
+test
+test.S
+test.lds
+
+/.vim
