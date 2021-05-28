@@ -9,5 +9,6 @@ function copy_suite() {
   done
 }
 
-copy_suite rv32ui-p
 copy_suite rv32mi-p
+copy_suite rv32si-p
+copy_suite rv32ui-p

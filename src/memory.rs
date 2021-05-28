@@ -82,7 +82,7 @@ impl Memory {
     pub fn read<T: Pod>(&self, addr: Address) -> Result<T> {
         // check alignment of the address
         if u64::from(addr) & (align_of::<T>() as u64 - 1) != 0 {
-            return Err(Exception::LoadAddressMisaligned);
+            return Err(Exception::LoadAddressMisaligned(addr));
         }
 
         // find the device that has the smallest, positive distance
@@ -114,7 +114,7 @@ impl Memory {
     pub fn write<T: Pod>(&mut self, addr: Address, item: T) -> Result<()> {
         // check alignment of the address
         if u64::from(addr) & (align_of::<T>() as u64 - 1) != 0 {
-            return Err(Exception::StoreAddressMisaligned);
+            return Err(Exception::StoreAddressMisaligned(addr));
         }
 
         // find the first device that contains the given address

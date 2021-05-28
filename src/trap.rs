@@ -48,8 +48,8 @@ pub enum Exception {
     InstructionAccessFault,
     IllegalInstruction(u64),
     Breakpoint,
-    LoadAddressMisaligned,
-    StoreAddressMisaligned,
+    LoadAddressMisaligned(Address),
+    StoreAddressMisaligned(Address),
     LoadAccessFault,
     StoreAccessFault,
     /// An environment call taken from U-mode.
@@ -72,9 +72,9 @@ impl Exception {
             Exception::InstructionAccessFault => 1,
             Exception::IllegalInstruction(..) => 2,
             Exception::Breakpoint => 3,
-            Exception::LoadAddressMisaligned => 4,
+            Exception::LoadAddressMisaligned(..) => 4,
             Exception::LoadAccessFault => 5,
-            Exception::StoreAddressMisaligned => 6,
+            Exception::StoreAddressMisaligned(..) => 6,
             Exception::StoreAccessFault => 7,
             Exception::UserEcall => 8,
             Exception::SupervisorEcall => 9,
@@ -90,12 +90,12 @@ impl Exception {
         match self {
             Exception::InstructionAccessFault
             | Exception::Breakpoint
-            | Exception::LoadAddressMisaligned
             | Exception::LoadAccessFault
-            | Exception::StoreAddressMisaligned
             | Exception::StoreAccessFault => pc,
             Exception::InstructionPageFault(val)
             | Exception::InstructionAddressMisaligned(val)
+            | Exception::LoadAddressMisaligned(val)
+            | Exception::StoreAddressMisaligned(val)
             | Exception::LoadPageFault(val)
             | Exception::StorePageFault(val) => *val,
             Exception::IllegalInstruction(val) => (*val).into(),
