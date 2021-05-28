@@ -90,8 +90,11 @@ impl Cpu {
             u64::from(self.arch.base.read_register(3.into()))
         );
 
-        if u64::from(pc) == 0x8000029c {
-            println!("a1 {:x?}", self.arch.base.read_register(11.into()));
+        if u64::from(pc) == 0x80000204 {
+            println!(
+                "mip {:x?}",
+                self.arch.zicsr.as_ref().unwrap().force_read_csr(csr::MIP)
+            );
         }
 
         // check alignment of instruction
@@ -104,9 +107,6 @@ impl Cpu {
 
         match c {
             Continuation::Next => self.arch.base.set_pc(new_pc),
-            // WFI is implemeted by just executing the `wfi` instruction over and over again.
-            // This is really expensive but it's simple and it works
-            Continuation::WaitForInterrupt => self.arch.base.set_pc(pc),
             Continuation::Jump => {}
         }
 

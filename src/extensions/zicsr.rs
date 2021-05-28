@@ -9,7 +9,7 @@ pub mod csr {
     pub use super::registers::*;
 }
 
-use super::rv32i::IType;
+use super::rv32i::{IType, RType};
 use crate::{
     cpu::{self, PrivilegeMode},
     extensions::rv32i::Register,
@@ -49,8 +49,20 @@ impl Extension {
         if !csr.writeable_in(mode) {
             return Err(Exception::IllegalInstruction(0));
         }
-        self.force_write_csr(csr, val);
-        Ok(())
+
+        match csr {
+            // trap when in S-mode and TVM=1
+            csr::SATP
+                if mode == PrivilegeMode::Supervisor
+                    && self.force_read_csr(csr::MSTATUS).get_bit(20) =>
+            {
+                Err(Exception::IllegalInstruction(0))
+            }
+            csr => {
+                self.force_write_csr(csr, val);
+                Ok(())
+            }
+        }
     }
 
     /// Try to read a given CSR.
@@ -58,7 +70,17 @@ impl Extension {
         if !csr.readable_in(mode) {
             return Err(Exception::IllegalInstruction(0));
         }
-        Ok(self.force_read_csr(csr))
+
+        match csr {
+            // trap when in S-mode and TVM=1
+            csr::SATP
+                if mode == PrivilegeMode::Supervisor
+                    && self.force_read_csr(csr::MSTATUS).get_bit(20) =>
+            {
+                Err(Exception::IllegalInstruction(0))
+            }
+            csr => Ok(self.force_read_csr(csr)),
+        }
     }
 
     /// Write the given `val` to the CSR with the given index, without checking permissions.
@@ -110,31 +132,38 @@ pub fn parse(inst: u32) -> Option<Instruction> {
     }
 
     let (funct3, ty) = IType::parse(inst);
-    let inst = match funct3 {
-        0b000 if ty.val & 0x1F == 0b10 => match ty.val >> 5 {
-            0b00000 => Instruction::URET,
-            0b01000 => Instruction::SRET,
-            0b11000 => Instruction::MRET,
-            _ => return None,
-        },
-        0b000 if ty.val & 0x1F == 0b101 => match ty.val >> 5 {
-            0b01000 => Instruction::WFI,
-            _ => return None,
-        },
-        0b001 => Instruction::CSRRW,
-        0b010 => Instruction::CSRRS,
-        0b011 => Instruction::CSRRC,
-        0b101 => Instruction::CSRRWI,
-        0b110 => Instruction::CSRRSI,
-        0b111 => Instruction::CSRRCI,
+    Some(match funct3 {
+        0b000 => {
+            let (funct3, funct7, ty) = RType::parse(inst);
+            if funct3 != 0b000 {
+                return None;
+            }
+
+            match u8::from(ty.rs2) {
+                0b00010 => match funct7 {
+                    0b00000 => Instruction::URET(ty),
+                    0b01000 => Instruction::SRET(ty),
+                    0b11000 => Instruction::MRET(ty),
+                    _ => return None,
+                },
+                0b00101 if funct7 == 0b0001000 => Instruction::WFI(ty),
+                _ if funct7 == 0b0001001 => Instruction::SFENCE_VMA(ty),
+                _ => return None,
+            }
+        }
+        0b001 => Instruction::CSRRW(ty),
+        0b010 => Instruction::CSRRS(ty),
+        0b011 => Instruction::CSRRC(ty),
+        0b101 => Instruction::CSRRWI(ty),
+        0b110 => Instruction::CSRRSI(ty),
+        0b111 => Instruction::CSRRCI(ty),
         _ => return None,
-    };
-    Some(inst(ty))
+    })
 }
 
 /// The instruction type of the Zicsr base extension.
 #[derive(Debug, Display)]
-#[allow(clippy::upper_case_acronyms)]
+#[allow(clippy::upper_case_acronyms, non_camel_case_types)]
 #[allow(missing_docs)]
 pub enum Instruction {
     #[display(fmt = "csrrw {}", "_0")]
@@ -151,13 +180,15 @@ pub enum Instruction {
     CSRRCI(IType),
 
     #[display(fmt = "uret")]
-    URET(IType),
+    URET(RType),
     #[display(fmt = "sret")]
-    SRET(IType),
+    SRET(RType),
     #[display(fmt = "mret")]
-    MRET(IType),
+    MRET(RType),
     #[display(fmt = "wfi")]
-    WFI(IType),
+    WFI(RType),
+    #[display(fmt = "sfence.vma {}", _0)]
+    SFENCE_VMA(RType),
 }
 
 impl crate::Instruction for Instruction {
@@ -222,7 +253,8 @@ impl crate::Instruction for Instruction {
             Instruction::CSRRSI(op) => imm_inst(cpu, op, |src, old_csr| src | old_csr),
             Instruction::CSRRCI(op) => imm_inst(cpu, op, |src, old_csr| old_csr & !src),
 
-            Instruction::WFI(_) => return Ok(Continuation::WaitForInterrupt),
+            // it's fine for WFI to be implemented as a no-op
+            Instruction::WFI(_) => Ok(()),
             Instruction::MRET(_) => {
                 if cpu.mode() != PrivilegeMode::Machine {
                     return Err(Exception::IllegalInstruction(0));
@@ -249,9 +281,13 @@ impl crate::Instruction for Instruction {
                 return Ok(Continuation::Jump);
             }
             Instruction::SRET(_) => {
-                if cpu.mode() != PrivilegeMode::Supervisor {
+                // trap when not in S-Mode, or we are in S-Mode and TSR=1
+                if cpu.mode() != PrivilegeMode::Supervisor
+                    || ext(cpu).force_read_csr(csr::MSTATUS).get_bit(22)
+                {
                     return Err(Exception::IllegalInstruction(0));
                 }
+
                 let ext = ext(cpu);
 
                 let new_pc = ext.read_csr(csr::SEPC, PrivilegeMode::Supervisor)?;
@@ -272,6 +308,17 @@ impl crate::Instruction for Instruction {
                 cpu.set_mode(PrivilegeMode::from_bits(u64::from(mpp) as u8));
 
                 return Ok(Continuation::Jump);
+            }
+            Instruction::SFENCE_VMA(_) => {
+                // trap when TVM=1 and executing in S-mode
+                if cpu.mode() == PrivilegeMode::Supervisor
+                    && ext(cpu).force_read_csr(csr::MSTATUS).get_bit(20)
+                {
+                    return Err(Exception::IllegalInstruction(0));
+                }
+
+                println!("executing sfence.vma which is a nop currently");
+                Ok(())
             }
             Instruction::URET(_) => todo!(),
         }

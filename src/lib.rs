@@ -20,8 +20,6 @@ pub enum Continuation {
     /// This was a "normal" instruction and the PC can be increased normally to point to the next
     /// instruction.
     Next,
-    /// This was a WFI instruction and the CPU should halt now.
-    WaitForInterrupt,
 }
 
 /// Trait for representing an extension-independent instruction.

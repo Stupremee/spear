@@ -37,7 +37,7 @@ register_test_suite![ rv32mi_p =>
     // rv32mi_p_csr,
 
     // FIXME: this test currently fails
-    // rv32mi_p_illegal,
+    illegal,
 
     // `EBREAK` is not yet implemented
     // rv32mi_p_sbreak,
