@@ -41,7 +41,7 @@ extension will also come to play with cool new features.
     - [ ] F v2.2
     - [ ] D v2.2
     - [x] Zicsr v2.0 (note that many CSRs do not work correctly or might not even be implemented)
-    - [x] Zifencei v2.0
+    - [x] Zifencei v2.0 (ICACHE emulation is not yet implemented, so `fence.i` is basically a NOP)
   - [ ] Q v2.2
   - [ ] C v2.0
   - [ ] All other extensions (low priority)
@@ -55,7 +55,7 @@ left to fix.
 
 Install the latest spear version from `main` branch by running the following command.
 ```sh
-cargo install --git https://github.com/Stupremee/spear
+cargo install --locked --git https://github.com/Stupremee/spear
 ```
 
 Now you can run `spike`! :tada:
