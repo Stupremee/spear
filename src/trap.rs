@@ -7,23 +7,6 @@ use crate::Address;
 /// The result type used for everything that can throw a trap.
 pub type Result<T> = std::result::Result<T, Exception>;
 
-/// This enum represents the kind of an exception, and how it should be handled.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Trap {
-    /// The trap is visible to, and handled by, software running inside the execution
-    /// environment.
-    Contained,
-    /// The trap is a synchronous exception that is an explicit call to the execution
-    /// environment requesting an action on behalf of software inside the execution environment.
-    Requested,
-    /// The trap is handled transparently by the execution environment and execution
-    /// resumes normally after the trap is handled.
-    Invisible,
-    /// The trap represents a fatal failure and causes the execution environment to terminate
-    /// execution.
-    Fatal,
-}
-
 /// All the interrupt kinds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(missing_docs)]
@@ -61,7 +44,7 @@ impl Interrupt {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(missing_docs)]
 pub enum Exception {
-    InstructionAddressMisaligned,
+    InstructionAddressMisaligned(Address),
     InstructionAccessFault,
     IllegalInstruction(u64),
     Breakpoint,
@@ -85,7 +68,7 @@ pub enum Exception {
 impl Exception {
     fn cause(self) -> u32 {
         match self {
-            Exception::InstructionAddressMisaligned => 0,
+            Exception::InstructionAddressMisaligned(..) => 0,
             Exception::InstructionAccessFault => 1,
             Exception::IllegalInstruction(..) => 2,
             Exception::Breakpoint => 3,
@@ -105,14 +88,14 @@ impl Exception {
 
     fn trap_value(&self, pc: Address) -> Address {
         match self {
-            Exception::InstructionAddressMisaligned
-            | Exception::InstructionAccessFault
+            Exception::InstructionAccessFault
             | Exception::Breakpoint
             | Exception::LoadAddressMisaligned
             | Exception::LoadAccessFault
             | Exception::StoreAddressMisaligned
             | Exception::StoreAccessFault => pc,
             Exception::InstructionPageFault(val)
+            | Exception::InstructionAddressMisaligned(val)
             | Exception::LoadPageFault(val)
             | Exception::StorePageFault(val) => *val,
             Exception::IllegalInstruction(val) => (*val).into(),
@@ -121,7 +104,7 @@ impl Exception {
     }
 
     /// Take this trap according to the exception kind.
-    pub fn take_trap(self, cpu: &mut Cpu) -> Trap {
+    pub fn take_trap(self, cpu: &mut Cpu) {
         let pc = cpu.arch().base.get_pc();
         let tval = self.trap_value(pc);
         let prv_mode = cpu.mode();
@@ -209,26 +192,6 @@ impl Exception {
             status.set_bits(11..=12, prv_mode.to_bits() as u64);
 
             ext.force_write_csr(csr::MSTATUS, status);
-        }
-
-        match self {
-            Exception::LoadAddressMisaligned
-            | Exception::InstructionAddressMisaligned
-            | Exception::InstructionAccessFault
-            | Exception::LoadAccessFault
-            | Exception::StoreAddressMisaligned
-            | Exception::StoreAccessFault => Trap::Fatal,
-
-            Exception::Breakpoint
-            | Exception::UserEcall
-            | Exception::SupervisorEcall
-            | Exception::MachineEcall => Trap::Requested,
-
-            Exception::IllegalInstruction(_)
-            | Exception::Interrupt(_)
-            | Exception::InstructionPageFault(_)
-            | Exception::LoadPageFault(_)
-            | Exception::StorePageFault(_) => Trap::Invisible,
         }
     }
 }

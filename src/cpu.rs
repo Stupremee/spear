@@ -84,11 +84,19 @@ impl Cpu {
 
         let pc = self.arch.base.get_pc();
         let inst = self.mem.read::<u32>(pc)?;
-        println!("{:#x?}", u64::from(pc));
+        println!(
+            "{:#x?} gp {:#x?}",
+            u64::from(pc),
+            u64::from(self.arch.base.read_register(3.into()))
+        );
+
+        if u64::from(pc) == 0x8000029c {
+            println!("a1 {:x?}", self.arch.base.read_register(11.into()));
+        }
 
         // check alignment of instruction
         if u64::from(pc) & 3 != 0 {
-            return Err(Exception::InstructionAddressMisaligned);
+            return Err(Exception::InstructionAddressMisaligned(pc));
         }
 
         let (len, c) = self.parse_and_exec(inst)?;

@@ -49,18 +49,7 @@ impl Extension {
         if !csr.writeable_in(mode) {
             return Err(Exception::IllegalInstruction(0));
         }
-
-        match csr {
-            csr::SSTATUS => {
-                self.csrs[csr::MSTATUS.0] =
-                    (self.csrs[csr::MSTATUS.0] & !csr::SSTATUS_MASK) | (val & csr::SSTATUS_MASK)
-            }
-            csr => {
-                let reg = &mut self.csrs[csr.0];
-                *reg = reg.to_self_kind(val);
-            }
-        }
-
+        self.force_write_csr(csr, val);
         Ok(())
     }
 
@@ -69,23 +58,39 @@ impl Extension {
         if !csr.readable_in(mode) {
             return Err(Exception::IllegalInstruction(0));
         }
-
-        match csr {
-            csr::SSTATUS => Ok(self.csrs[csr::MSTATUS.0] & csr::SSTATUS_MASK),
-            csr::CYCLE => Ok(dbg!(self.csrs[csr.0])),
-            csr => Ok(self.csrs[csr.0]),
-        }
+        Ok(self.force_read_csr(csr))
     }
 
     /// Write the given `val` to the CSR with the given index, without checking permissions.
     pub fn force_write_csr(&mut self, csr: CsrAddress, val: Address) {
-        let reg = &mut self.csrs[csr.0];
-        *reg = reg.to_self_kind(val);
+        match csr {
+            csr::SSTATUS => {
+                self.csrs[csr::MSTATUS.0] =
+                    (self.csrs[csr::MSTATUS.0] & !csr::SSTATUS_MASK) | (val & csr::SSTATUS_MASK)
+            }
+            csr::SIE => {
+                let mideleg = self.csrs[csr::MIDELEG.0];
+                self.csrs[csr::MIE.0] = (self.csrs[csr::MIE.0] & !mideleg) | (val & mideleg);
+            }
+            csr::SIP => {
+                let mask = self.csrs[csr::MIDELEG.0] & (1u32 << 1);
+                self.csrs[csr::MIP.0] = (self.csrs[csr::MIP.0] & !mask) | (val & mask);
+            }
+            csr => {
+                let reg = &mut self.csrs[csr.0];
+                *reg = reg.to_self_kind(val);
+            }
+        }
     }
 
     /// Read a given CSR without checking permissions.
     pub fn force_read_csr(&self, csr: CsrAddress) -> Address {
-        self.csrs[csr.0]
+        match csr {
+            csr::SSTATUS => self.csrs[csr::MSTATUS.0] & csr::SSTATUS_MASK,
+            csr::SIE => self.csrs[csr::MIE.0] & self.csrs[csr::MIDELEG.0],
+            csr::SIP => self.csrs[csr::MIP.0] & self.csrs[csr::MIDELEG.0],
+            csr => self.csrs[csr.0],
+        }
     }
 }
 
@@ -243,7 +248,32 @@ impl crate::Instruction for Instruction {
 
                 return Ok(Continuation::Jump);
             }
-            _ => todo!(),
+            Instruction::SRET(_) => {
+                if cpu.mode() != PrivilegeMode::Supervisor {
+                    return Err(Exception::IllegalInstruction(0));
+                }
+                let ext = ext(cpu);
+
+                let new_pc = ext.read_csr(csr::SEPC, PrivilegeMode::Supervisor)?;
+                let mut status = ext.read_csr(csr::SSTATUS, PrivilegeMode::Supervisor)?;
+
+                // extract the SPP field from `sstatus`
+                let mpp = status.get_bit(8);
+
+                // set the new SIE field to the SPIE field
+                status.set_bit(1, status.get_bit(5));
+                // set the SPIE field to 1
+                status.set_bit(5, true);
+                // set the SPP field to U-mode
+                status.set_bit(8, false);
+
+                ext.write_csr(csr::SSTATUS, status, PrivilegeMode::Supervisor)?;
+                cpu.set_pc(new_pc);
+                cpu.set_mode(PrivilegeMode::from_bits(u64::from(mpp) as u8));
+
+                return Ok(Continuation::Jump);
+            }
+            Instruction::URET(_) => todo!(),
         }
         .map(|_| Continuation::Next)
     }

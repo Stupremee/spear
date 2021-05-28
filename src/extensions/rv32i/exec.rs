@@ -29,7 +29,7 @@ pub fn exec(
 
             // jump target must be aligned to 4 byte boundary
             if target & 3u32 != 0u32.into() {
-                return Err(Exception::InstructionAddressMisaligned);
+                return Err(Exception::InstructionAddressMisaligned(target));
             }
 
             ext.set_pc(target);
@@ -47,7 +47,7 @@ pub fn exec(
 
             // jump target must be aligned to 4 byte boundary
             if target & 3u32 != 0u32.into() {
-                return Err(Exception::InstructionAddressMisaligned);
+                return Err(Exception::InstructionAddressMisaligned(target));
             }
 
             ext.set_pc(target);
@@ -167,7 +167,7 @@ fn branch<F: FnOnce(Address, Address) -> bool>(
 
         // jump target must be aligned to 4 byte boundary
         if target & 3u32 != 0u32.into() {
-            return Err(Exception::InstructionAddressMisaligned);
+            return Err(Exception::InstructionAddressMisaligned(target));
         }
 
         ext.set_pc(target);

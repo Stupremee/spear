@@ -32,6 +32,7 @@ test_instructions! { rv32i,
         0xA78080E7: "jalr ra, ra, -1416",
         0xE4A080E7: "jalr ra, ra, -438",
         0x464080E7: "jalr ra, ra, 1124",
+        0x00228367: "jalr t1, t0, 2",
     }
     test_beq_inst {
         0x09170A63: "beq a4, a7, 148",
