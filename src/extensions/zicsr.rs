@@ -194,11 +194,11 @@ pub enum Instruction {
 impl crate::Instruction for Instruction {
     fn exec(self, cpu: &mut cpu::Cpu) -> Result<Continuation> {
         fn ext(cpu: &mut cpu::Cpu) -> &mut Extension {
-            cpu.arch().zicsr.as_mut().unwrap()
+            cpu.arch.zicsr.as_mut().unwrap()
         }
 
         fn base(cpu: &mut cpu::Cpu) -> &mut super::rv32i::Extension {
-            cpu.arch().base()
+            cpu.arch.base()
         }
 
         fn inst<F: FnOnce(Address, Address) -> Address>(

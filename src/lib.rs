@@ -9,6 +9,7 @@ pub mod cpu;
 pub mod emulator;
 pub mod extensions;
 pub mod memory;
+pub mod mmu;
 pub mod trap;
 
 /// Outcomes of an instruction execution which influences the behaviour of the CPU after

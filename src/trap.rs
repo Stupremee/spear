@@ -106,16 +106,16 @@ impl Exception {
 
     /// Take this trap according to the exception kind.
     pub fn take_trap(self, cpu: &mut Cpu) {
-        let pc = cpu.arch().base.get_pc();
+        let pc = cpu.arch.base.get_pc();
         let tval = self.trap_value(pc);
         let prv_mode = cpu.mode();
         let cause = self.cause();
 
         let int_bit = matches!(self, Exception::Interrupt(..)) as u32;
-        let int_bit = int_bit << (cpu.arch().xlen - 1);
+        let int_bit = int_bit << (cpu.arch.xlen - 1);
 
         let mut cpu = CpuOrExtension::new(cpu, |cpu| {
-            cpu.arch()
+            cpu.arch
                 .zicsr
                 .as_mut()
                 .expect("can not take trap if Zicsr extension is disabled")

@@ -213,7 +213,7 @@ fn store_inst<T: Pod, F: FnOnce(u64) -> T>(
 }
 
 fn verify_shamt(cpu: &mut cpu::Cpu, x: u8) -> Result<()> {
-    if x >= cpu.arch().xlen as u8 {
+    if x >= cpu.arch.xlen as u8 {
         Err(Exception::IllegalInstruction(0))
     } else {
         Ok(())

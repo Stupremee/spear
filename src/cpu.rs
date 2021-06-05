@@ -4,6 +4,7 @@
 use crate::{
     extensions::zicsr::csr,
     memory::Memory,
+    mmu::{self, Mmu},
     trap::{Exception, Interrupt, Result},
     Address, Architecture, Continuation, Extension, Instruction,
 };
@@ -61,8 +62,9 @@ impl PrivilegeMode {
 
 /// Representation of a single physical CPU.
 pub struct Cpu {
-    arch: Architecture,
-    mem: Memory,
+    pub(crate) arch: Architecture,
+    pub(crate) mem: Memory,
+    mmu: Mmu,
     mode: PrivilegeMode,
 }
 
@@ -73,6 +75,7 @@ impl Cpu {
             arch,
             mem,
             mode: PrivilegeMode::Machine,
+            mmu: Mmu::new(),
         }
     }
 
@@ -84,7 +87,8 @@ impl Cpu {
         }
 
         let pc = self.arch.base.get_pc();
-        let inst = self.mem.read::<u32>(pc)?;
+        let addr = self.mmu.translate(self, pc, mmu::AccessType::Fetch)?;
+        let inst = self.mem.read::<u32>(addr)?;
 
         // check alignment of instruction
         if u64::from(pc) & 3 != 0 {
@@ -165,22 +169,19 @@ impl Cpu {
 
     /// Read a `T` from the given address.
     pub fn read<T: Pod>(&self, addr: Address) -> Result<T> {
+        let addr = self.mmu.translate(self, addr, mmu::AccessType::Read)?;
         self.mem.read(addr)
     }
 
     /// Write a `T` to the given address.
     pub fn write<T: Pod>(&mut self, addr: Address, item: T) -> Result<()> {
+        let addr = self.mmu.translate(self, addr, mmu::AccessType::Write)?;
         self.mem.write(addr, item)
     }
 
     /// Set the program counter to the given value.
     pub fn set_pc(&mut self, pc: Address) {
         self.arch.base.set_pc(pc);
-    }
-
-    /// Update the privilege mode to the given mode.
-    pub fn set_mode(&mut self, new: PrivilegeMode) {
-        self.mode = new;
     }
 
     /// Return a reference to the underyling architecture of this CPU.
@@ -191,6 +192,11 @@ impl Cpu {
     /// Return a reference to the underyling memory of this CPU.
     pub fn mem(&mut self) -> &mut Memory {
         &mut self.mem
+    }
+
+    /// Update the privilege mode to the given mode.
+    pub fn set_mode(&mut self, new: PrivilegeMode) {
+        self.mode = new;
     }
 
     /// Return the current privilege mode of this CPU.

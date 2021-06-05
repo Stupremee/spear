@@ -398,7 +398,7 @@ pub enum Instruction {
 
 impl crate::Instruction for Instruction {
     fn exec(self, cpu: &mut cpu::Cpu) -> trap::Result<Continuation> {
-        let cpu = cpu::CpuOrExtension::new(cpu, |cpu| &mut cpu.arch().base);
+        let cpu = cpu::CpuOrExtension::new(cpu, |cpu| &mut cpu.arch.base);
         exec(self, cpu)
     }
 
