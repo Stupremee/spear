@@ -3,12 +3,11 @@
 
 use crate::{
     extensions::zicsr::csr,
-    memory::Memory,
+    memory::{Memory, MemoryData},
     mmu::{self, Mmu},
     trap::{Exception, Interrupt, Result},
     Address, Architecture, Continuation, Extension, Instruction,
 };
-use bytemuck::Pod;
 use log::trace;
 
 /// Different privilege modes a CPU core can be in.
@@ -168,13 +167,13 @@ impl Cpu {
     }
 
     /// Read a `T` from the given address.
-    pub fn read<T: Pod>(&self, addr: Address) -> Result<T> {
+    pub fn read<T: MemoryData>(&self, addr: Address) -> Result<T> {
         let addr = self.mmu.translate(self, addr, mmu::AccessType::Read)?;
         self.mem.read(addr)
     }
 
     /// Write a `T` to the given address.
-    pub fn write<T: Pod>(&mut self, addr: Address, item: T) -> Result<()> {
+    pub fn write<T: MemoryData>(&mut self, addr: Address, item: T) -> Result<()> {
         let addr = self.mmu.translate(self, addr, mmu::AccessType::Write)?;
         self.mem.write(addr, item)
     }

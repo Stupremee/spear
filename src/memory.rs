@@ -3,9 +3,11 @@
 //! The main type of this module is the [`Memory`] struct, which contains
 //! a list of [`MemoryDevice`]s that are used to read, and write raw memory.
 
+mod traits;
+pub use traits::MemoryData;
+
 use super::Address;
 use crate::trap::{Exception, Result};
-use bytemuck::{bytes_of, bytes_of_mut, Pod};
 use object::{File, Object, ObjectSegment};
 use std::collections::BTreeMap;
 use std::mem::align_of;
@@ -79,7 +81,7 @@ impl Memory {
     /// # Returns
     ///
     /// `None` if the read failed.
-    pub fn read<T: Pod>(&self, addr: Address) -> Result<T> {
+    pub fn read<T: MemoryData>(&self, addr: Address) -> Result<T> {
         // check alignment of the address
         if u64::from(addr) & (align_of::<T>() as u64 - 1) != 0 {
             return Err(Exception::LoadAddressMisaligned(addr));
@@ -101,8 +103,8 @@ impl Memory {
 
         // create a zeroed `T` to read into
         let mut item = T::zeroed();
-        device.load(addr - offset, bytes_of_mut(&mut item))?;
-        Ok(item)
+        device.load(addr - offset, bytemuck::bytes_of_mut(&mut item))?;
+        Ok(item.process_read())
     }
 
     /// Write a `T` to the given address.
@@ -111,7 +113,7 @@ impl Memory {
     ///
     /// `None` if the read failed, which may be caused by unaligned address,
     /// no physical memory for `addr` and others.
-    pub fn write<T: Pod>(&mut self, addr: Address, item: T) -> Result<()> {
+    pub fn write<T: MemoryData>(&mut self, addr: Address, item: T) -> Result<()> {
         // check alignment of the address
         if u64::from(addr) & (align_of::<T>() as u64 - 1) != 0 {
             return Err(Exception::StoreAddressMisaligned(addr));
@@ -131,7 +133,8 @@ impl Memory {
             .ok_or(Exception::StoreAccessFault)?;
 
         // write the item into the device
-        device.write(addr - offset, bytes_of(&item))?;
+        let item = item.process_write();
+        device.write(addr - offset, bytemuck::bytes_of(&item))?;
         Ok(())
     }
 }
