@@ -1,8 +1,10 @@
 _entry:
-  li t1, 255
-  la t0, tohost
+  li t1, 1
+  slli t1, t1, 31
+  csrrw x0, satp, t1
 
 exit:
+  la t0, tohost
   sw t1, 0(t0)
   j exit
 

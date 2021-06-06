@@ -63,7 +63,15 @@ impl Memory {
 
         // go through each section that is not at address zero and has no zero size
         for seg in obj.segments() {
-            let dev = RamDevice::from_vec(seg.data()?.to_vec());
+            // first, get the predefined data from the file
+            let mut data = seg.data()?.to_vec();
+
+            // then extend the segment to it's real size with zeroes
+            data.resize(seg.size() as usize, 0);
+
+            log::info!("loading seg {:x?} data len {:x}", seg, data.len());
+
+            let dev = RamDevice::from_vec(data);
             self.add_device(seg.address().into(), dev);
         }
 
