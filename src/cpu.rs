@@ -2,11 +2,11 @@
 //! RISC-V code.
 
 use crate::{
+    device::DeviceBus,
     extensions::zicsr::csr,
-    memory::{Memory, MemoryData},
     mmu::{self, Mmu},
     trap::{Exception, Interrupt, Result},
-    Address, Architecture, Continuation, Extension, Instruction,
+    Address, Architecture, Continuation, Extension, Instruction, MemoryPod,
 };
 use log::trace;
 
@@ -62,17 +62,17 @@ impl PrivilegeMode {
 /// Representation of a single physical CPU.
 pub struct Cpu {
     pub(crate) arch: Architecture,
-    pub(crate) mem: Memory,
+    pub(crate) bus: DeviceBus,
     mmu: Mmu,
     mode: PrivilegeMode,
 }
 
 impl Cpu {
     /// Create a new CPU.
-    pub fn new(arch: Architecture, mem: Memory) -> Self {
+    pub fn new(arch: Architecture, bus: DeviceBus) -> Self {
         Self {
             arch,
-            mem,
+            bus,
             mode: PrivilegeMode::Machine,
             mmu: Mmu::new(),
         }
@@ -87,7 +87,7 @@ impl Cpu {
 
         let pc = self.arch.base.get_pc();
         let addr = self.mmu.translate(self, pc, mmu::AccessType::Fetch)?;
-        let inst = self.mem.read::<u32>(addr)?;
+        let inst = self.bus.read::<u32>(addr)?;
 
         // check alignment of instruction
         if u64::from(pc) & 3 != 0 {
@@ -167,15 +167,15 @@ impl Cpu {
     }
 
     /// Read a `T` from the given address.
-    pub fn read<T: MemoryData>(&self, addr: Address) -> Result<T> {
+    pub fn read<T: MemoryPod>(&self, addr: Address) -> Result<T> {
         let addr = self.mmu.translate(self, addr, mmu::AccessType::Read)?;
-        self.mem.read(addr)
+        self.bus.read(addr)
     }
 
     /// Write a `T` to the given address.
-    pub fn write<T: MemoryData>(&mut self, addr: Address, item: T) -> Result<()> {
+    pub fn write<T: MemoryPod>(&mut self, addr: Address, item: T) -> Result<()> {
         let addr = self.mmu.translate(self, addr, mmu::AccessType::Write)?;
-        self.mem.write(addr, item)
+        self.bus.write(addr, item)
     }
 
     /// Set the program counter to the given value.
@@ -188,9 +188,9 @@ impl Cpu {
         &mut self.arch
     }
 
-    /// Return a reference to the underyling memory of this CPU.
-    pub fn mem(&mut self) -> &mut Memory {
-        &mut self.mem
+    /// Return a reference to the underyling device bus.
+    pub fn bus(&mut self) -> &mut DeviceBus {
+        &mut self.bus
     }
 
     /// Update the privilege mode to the given mode.

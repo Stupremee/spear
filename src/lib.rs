@@ -5,10 +5,12 @@
 mod address;
 pub use address::{Address, AddressKind};
 
+pub mod device;
+pub use device::MemoryPod;
+
 pub mod cpu;
 pub mod emulator;
 pub mod extensions;
-pub mod memory;
 pub mod mmu;
 pub mod trap;
 

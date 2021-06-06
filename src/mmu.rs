@@ -85,7 +85,7 @@ impl Mmu {
             // read the PTE from the current page table
             let pte = match info.ptesize {
                 4 => cpu
-                    .mem
+                    .bus
                     .read::<u32>(base + idx * info.ptesize)
                     .map_err(|_| error_for_mode(addr, mode))? as u64,
                 _ => unreachable!(),
@@ -109,7 +109,9 @@ impl Mmu {
                         .then(|| {
                             // add the offset inside the page and return the physical address
                             let off = addr & 0xFFFu32;
-                            phys + off
+                            let virt = phys + off;
+                            log::trace!("translated {} to {}", virt, addr);
+                            virt
                         })
                         .ok_or_else(|| error_for_mode(addr, mode));
                 }

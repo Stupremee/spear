@@ -3,7 +3,7 @@ use std::fmt;
 use std::ops::{self, Bound, Range, RangeBounds};
 
 /// Different representations of an address.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash)]
 pub enum AddressKind {
     /// 32-bit address
     U32(u32),
@@ -15,7 +15,7 @@ pub enum AddressKind {
 ///
 /// This type also provides abstractions for converting between 32 and 64 (and soon 128)
 /// bit addresses.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash)]
 pub struct Address(AddressKind);
 
 impl fmt::Display for Address {

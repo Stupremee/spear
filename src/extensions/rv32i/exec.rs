@@ -3,9 +3,8 @@
 use super::{Extension, Instruction, Register};
 use crate::{
     cpu,
-    memory::MemoryData,
     trap::{Exception, Result},
-    Address, AddressKind, Continuation,
+    Address, AddressKind, Continuation, MemoryPod,
 };
 
 /// Execute a RV32I instruction on the given cpu.
@@ -187,7 +186,7 @@ fn imm_inst<F: FnOnce(Address) -> Address>(ext: &mut Extension, rs: Register, rd
     ext.write_register(rd, op(src));
 }
 
-fn load_inst<T: MemoryData, F: FnOnce(T) -> Address>(
+fn load_inst<T: MemoryPod, F: FnOnce(T) -> Address>(
     op: super::IType,
     mut cpu: cpu::CpuOrExtension<'_, Extension>,
     conv: F,
@@ -198,7 +197,7 @@ fn load_inst<T: MemoryData, F: FnOnce(T) -> Address>(
     Ok(())
 }
 
-fn store_inst<T: MemoryData, F: FnOnce(u64) -> T>(
+fn store_inst<T: MemoryPod, F: FnOnce(u64) -> T>(
     op: super::SType,
     mut cpu: cpu::CpuOrExtension<'_, Extension>,
     conv: F,

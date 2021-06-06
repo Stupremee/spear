@@ -1,7 +1,7 @@
 //! This module implements abstractions for loading, executing and debugging RISC-V code
 //! using the spear emulator.
 
-use crate::{cpu::Cpu, memory::Memory, Address, Architecture};
+use crate::{cpu::Cpu, device::DeviceBus, Address, Architecture};
 use object::{Object, ObjectSymbol};
 
 /// The `Emulator` is responsible for loading, initializing and running a [`Cpu`].
@@ -19,7 +19,7 @@ impl Emulator {
         arch.base().set_pc((object.entry() as u32).into());
 
         // load the file into memory
-        let mut mem = Memory::new();
+        let mut mem = DeviceBus::new();
         mem.load_object(object)?;
 
         Ok(Emulator {

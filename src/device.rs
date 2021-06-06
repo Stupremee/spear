@@ -1,22 +1,29 @@
-//! Physical memory management.
-//!
-//! The main type of this module is the [`Memory`] struct, which contains
-//! a list of [`MemoryDevice`]s that are used to read, and write raw memory.
+//! Implementation of a generic device. The device can be anything from a simple memory device,
+//! to the PLIC or UART device.
 
-mod traits;
-pub use traits::MemoryData;
+mod ram;
+pub use ram::RamDevice;
 
-use super::Address;
-use crate::trap::{Exception, Result};
+use crate::{
+    trap::{Exception, Result},
+    Address,
+};
+use bytemuck::Pod;
 use object::{File, Object, ObjectSegment};
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::mem::align_of;
 
-/// Anything that can be used to access memory, including RAM and MMIO devices.
+/// The default memory size that each device bus will allocate by default.
+pub const DEFAULT_MEMORY_SIZE: usize = 2 << 20;
+
+/// The address where DRAM will start.
+pub const DRAM_BASE: u64 = 0x8000_0000;
+
+/// Any device that is able to read/write memory from/to.
 ///
 /// Any device must specify the size it covers using the `size()` method, but it can not control
 /// the base address, since that will be done by the user.
-pub trait MemoryDevice {
+pub trait Device {
     /// The number of bytes this memory device covers, starting from the base address.
     fn size(&self) -> u64;
 
@@ -41,22 +48,24 @@ pub trait MemoryDevice {
     fn write(&mut self, addr: Address, buf: &[u8]) -> Result<()>;
 }
 
-/// The main struct of this module, which acts as a memory bus combining multiple
-/// [`MemoryDevice`]s into one spot.
-#[derive(Default)]
-pub struct Memory {
-    devices: BTreeMap<Address, Box<dyn MemoryDevice>>,
+/// The emulation of a data bus that contains a bunch of devices at specific addresses.
+///
+/// Used for reading and writing memory.
+pub struct DeviceBus {
+    devices: HashMap<Address, Box<dyn Device>>,
 }
 
-impl Memory {
-    /// Create a new memory bus without any devices.
+impl DeviceBus {
+    /// Create a new memory bus with a RAM device with [`DEFAULT_MEMORY_SIZE`] bytes.
     pub fn new() -> Self {
-        Self::default()
+        let mut bus = DeviceBus {
+            devices: HashMap::new(),
+        };
+        bus.add_device(DRAM_BASE.into(), RamDevice::new(DEFAULT_MEMORY_SIZE));
+        bus
     }
 
     /// Load an object file that was previously parsed by the [`object`] crate.
-    ///
-    /// This method will create multiple RAM devices into this memory bus.
     pub fn load_object(&mut self, obj: File<'_>) -> object::Result<()> {
         // FIXME: Check for RISC-V architecture
         assert!(obj.is_little_endian(), "Big Endian not supported");
@@ -69,17 +78,21 @@ impl Memory {
             // then extend the segment to it's real size with zeroes
             data.resize(seg.size() as usize, 0);
 
-            log::info!("loading seg {:x?} data len {:x}", seg, data.len());
+            // write the data into the RAM device
+            let addr = seg.address().into();
+            let (&offset, dev) = self
+                .device_for_mut(addr)
+                .expect("failed to find device to write ELF segment into");
 
-            let dev = RamDevice::from_vec(data);
-            self.add_device(seg.address().into(), dev);
+            dev.write(addr - offset, &data)
+                .expect("failed to write ELF segment to device");
         }
 
         Ok(())
     }
 
     /// Add a new device to this memory bus, that starts at the `base` address.
-    pub fn add_device(&mut self, base: Address, dev: impl MemoryDevice + 'static) {
+    pub fn add_device(&mut self, base: Address, dev: impl Device + 'static) {
         // FIXME: check overlap of addresses here
         self.devices.insert(base, Box::new(dev));
     }
@@ -89,7 +102,7 @@ impl Memory {
     /// # Returns
     ///
     /// `None` if the read failed.
-    pub fn read<T: MemoryData>(&self, addr: Address) -> Result<T> {
+    pub fn read<T: MemoryPod>(&self, addr: Address) -> Result<T> {
         // check alignment of the address
         if u64::from(addr) & (align_of::<T>() as u64 - 1) != 0 {
             return Err(Exception::LoadAddressMisaligned(addr));
@@ -97,17 +110,7 @@ impl Memory {
 
         // find the device that has the smallest, positive distance
         // from the requested address
-        let (&offset, device) = self
-            .devices
-            .iter()
-            .find(|(&k, v)| {
-                let base = u64::from(k);
-                let end = base + v.size();
-                let addr = u64::from(addr);
-
-                base <= addr && addr < end
-            })
-            .ok_or(Exception::LoadAccessFault)?;
+        let (&offset, device) = self.device_for(addr).ok_or(Exception::LoadAccessFault)?;
 
         // create a zeroed `T` to read into
         let mut item = T::zeroed();
@@ -121,7 +124,7 @@ impl Memory {
     ///
     /// `None` if the read failed, which may be caused by unaligned address,
     /// no physical memory for `addr` and others.
-    pub fn write<T: MemoryData>(&mut self, addr: Address, item: T) -> Result<()> {
+    pub fn write<T: MemoryPod>(&mut self, addr: Address, item: T) -> Result<()> {
         // check alignment of the address
         if u64::from(addr) & (align_of::<T>() as u64 - 1) != 0 {
             return Err(Exception::StoreAddressMisaligned(addr));
@@ -129,15 +132,7 @@ impl Memory {
 
         // find the first device that contains the given address
         let (&offset, device) = self
-            .devices
-            .iter_mut()
-            .find(|(&k, v)| {
-                let base = u64::from(k);
-                let end = base + v.size();
-                let addr = u64::from(addr);
-
-                base <= addr && addr < end
-            })
+            .device_for_mut(addr)
             .ok_or(Exception::StoreAccessFault)?;
 
         // write the item into the device
@@ -145,54 +140,55 @@ impl Memory {
         device.write(addr - offset, bytemuck::bytes_of(&item))?;
         Ok(())
     }
-}
 
-/// A [`MemoryDevice`] which acts as a RAM module containing a fixed buffer of memory.
-pub struct RamDevice {
-    ram: Box<[u8]>,
-}
+    fn device_for(&self, addr: Address) -> Option<(&Address, &Box<dyn Device>)> {
+        self.devices.iter().find(|(&k, v)| {
+            let base = u64::from(k);
+            let end = base + v.size();
+            let addr = u64::from(addr);
 
-impl RamDevice {
-    /// Create a new RAM device that is able to hold `size` bytes of memory.
-    pub fn new(size: usize) -> Self {
-        Self {
-            ram: vec![0u8; size].into_boxed_slice(),
-        }
+            base <= addr && addr < end
+        })
     }
 
-    /// Create a RAM device that is initialized using the given vec.
-    pub fn from_vec(vec: Vec<u8>) -> Self {
-        Self {
-            ram: vec.into_boxed_slice(),
-        }
-    }
-}
+    fn device_for_mut(&mut self, addr: Address) -> Option<(&Address, &mut Box<dyn Device>)> {
+        self.devices.iter_mut().find(|(&k, v)| {
+            let base = u64::from(k);
+            let end = base + v.size();
+            let addr = u64::from(addr);
 
-impl MemoryDevice for RamDevice {
-    fn size(&self) -> u64 {
-        self.ram.len() as u64
-    }
-
-    fn load(&self, addr: Address, buf: &mut [u8]) -> Result<()> {
-        let addr = u64::from(addr) as usize;
-        if let Some(from) = self.ram.get(addr..addr + buf.len()) {
-            buf.copy_from_slice(from);
-            Ok(())
-        } else {
-            Err(Exception::LoadAccessFault)
-        }
-    }
-
-    fn write(&mut self, addr: Address, buf: &[u8]) -> Result<()> {
-        let addr = u64::from(addr) as usize;
-        if let Some(to) = self.ram.get_mut(addr..addr + buf.len()) {
-            to.copy_from_slice(buf);
-            Ok(())
-        } else {
-            Err(Exception::StoreAccessFault)
-        }
+            base <= addr && addr < end
+        })
     }
 }
+
+/// Trait for reading and writing arbitrary values from [`Memory`](super::Memory).
+pub trait MemoryPod: Pod {
+    /// After reading a type, it may need further processing, e.g. swapping bytes for the correct
+    /// endianess.
+    fn process_read(self) -> Self;
+
+    /// Before writing this type to memory, it may need further processing.
+    fn process_write(self) -> Self;
+}
+
+macro_rules! impl_int {
+    ($($int:ty),*$(,)?) => {
+        $(
+        impl MemoryPod for $int {
+            fn process_read(self) -> Self {
+                self.to_le()
+            }
+
+            fn process_write(self) -> Self {
+                <$int>::from_le(self)
+            }
+        }
+        )*
+    };
+}
+
+impl_int!(usize, u8, u16, u32, u64, isize, i8, i16, i32, i64);
 
 #[cfg(test)]
 mod tests {
@@ -200,16 +196,15 @@ mod tests {
 
     #[test]
     fn read_write_ram() {
-        let mut mem = Memory::new();
-        mem.add_device(0xABCD_0000u32.into(), RamDevice::new(256));
+        let mut mem = DeviceBus::new();
 
         assert_eq!(
-            mem.read::<u64>(0x8000_0000u32.into()),
+            mem.read::<u64>(0x6000_0000u32.into()),
             Err(Exception::LoadAccessFault)
         );
-        assert_eq!(mem.read::<u64>(0xABCD_0000u32.into()), Ok(0u64));
+        assert_eq!(mem.read::<u64>(0x8000_0000u32.into()), Ok(0u64));
 
-        assert_eq!(mem.write::<u64>(0xABCD_0000u32.into(), 0x1234), Ok(()));
-        assert_eq!(mem.read::<u64>(0xABCD_0000u32.into()), Ok(0x1234));
+        assert_eq!(mem.write::<u64>(0x8000_0000u32.into(), 0x1234), Ok(()));
+        assert_eq!(mem.read::<u64>(0x8000_0000u32.into()), Ok(0x1234));
     }
 }
