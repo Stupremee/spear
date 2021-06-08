@@ -17,10 +17,10 @@ const BIT_V: u64 = 0x01;
 const BIT_R: u64 = 0x02;
 const BIT_W: u64 = 0x04;
 const BIT_X: u64 = 0x08;
-const BIT_U: u64 = 0x10;
-const BIT_G: u64 = 0x20;
-const BIT_A: u64 = 0x40;
-const BIT_D: u64 = 0x80;
+//const BIT_U: u64 = 0x10;
+//const BIT_G: u64 = 0x20;
+//const BIT_A: u64 = 0x40;
+//const BIT_D: u64 = 0x80;
 
 /// Different access types that memory can be accessed for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,12 +94,12 @@ impl Mmu {
                 } => {
                     // compare permissions of the PTE with the access type
                     // FIXME: Add support for SUM and MXR bit
-                    let allowed = match (mode, read, write, exec) {
+                    let allowed = matches!(
+                        (mode, read, write, exec),
                         (AccessType::Read, true, _, _)
-                        | (AccessType::Write, _, true, _)
-                        | (AccessType::Fetch, _, _, true) => true,
-                        _ => false,
-                    };
+                            | (AccessType::Write, _, true, _)
+                            | (AccessType::Fetch, _, _, true)
+                    );
 
                     if !allowed {
                         return Err(error);

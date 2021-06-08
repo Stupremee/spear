@@ -141,6 +141,7 @@ impl DeviceBus {
         Ok(())
     }
 
+    #[allow(clippy::borrowed_box)]
     fn device_for(&self, addr: Address) -> Option<(&Address, &Box<dyn Device>)> {
         self.devices.iter().find(|(&k, v)| {
             let base = u64::from(k);
@@ -162,7 +163,7 @@ impl DeviceBus {
     }
 }
 
-/// Trait for reading and writing arbitrary values from [`Memory`](super::Memory).
+/// Trait for reading and writing arbitrary values from a [`DeviceBus`].
 pub trait MemoryPod: Pod {
     /// After reading a type, it may need further processing, e.g. swapping bytes for the correct
     /// endianess.

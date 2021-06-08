@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
-use std::fmt;
 use std::ops::{self, Bound, Range, RangeBounds};
+use std::{fmt, hash};
 
 /// Different representations of an address.
 #[derive(Debug, Clone, Copy, Hash)]
@@ -15,7 +15,7 @@ pub enum AddressKind {
 ///
 /// This type also provides abstractions for converting between 32 and 64 (and soon 128)
 /// bit addresses.
-#[derive(Debug, Clone, Copy, Hash)]
+#[derive(Debug, Clone, Copy)]
 pub struct Address(AddressKind);
 
 impl fmt::Display for Address {
@@ -132,6 +132,15 @@ impl PartialEq for Address {
     }
 }
 impl Eq for Address {}
+
+impl hash::Hash for Address {
+    fn hash<H: hash::Hasher>(&self, h: &mut H) {
+        match self.0 {
+            AddressKind::U64(a) => hash::Hash::hash(&a, h),
+            AddressKind::U32(a) => hash::Hash::hash(&a, h),
+        }
+    }
+}
 
 impl PartialOrd for Address {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {

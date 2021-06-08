@@ -1,6 +1,6 @@
 use super::{Address, Device, Exception, Result};
 
-/// A [`MemoryDevice`] which acts as a RAM module containing a fixed buffer of memory.
+/// A [`Device`] which acts as a RAM module containing a fixed buffer of memory.
 pub struct RamDevice {
     ram: Box<[u8]>,
 }

@@ -1,6 +1,7 @@
 //! todo
 #![forbid(unsafe_code)]
 #![deny(broken_intra_doc_links, rust_2018_idioms, missing_docs)]
+#![allow(clippy::new_without_default)]
 
 mod address;
 pub use address::{Address, AddressKind};
