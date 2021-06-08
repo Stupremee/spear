@@ -17,10 +17,10 @@ const BIT_V: u64 = 0x01;
 const BIT_R: u64 = 0x02;
 const BIT_W: u64 = 0x04;
 const BIT_X: u64 = 0x08;
-//const BIT_U: u64 = 0x10;
-//const BIT_G: u64 = 0x20;
-//const BIT_A: u64 = 0x40;
-//const BIT_D: u64 = 0x80;
+const BIT_U: u64 = 0x10;
+// const BIT_G: u64 = 0x20;
+// const BIT_A: u64 = 0x40;
+// const BIT_D: u64 = 0x80;
 
 /// Different access types that memory can be accessed for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,20 +86,34 @@ impl Mmu {
                     table = next;
                     continue;
                 }
-                Entry::Leaf {
-                    ppn,
-                    read,
-                    write,
-                    exec,
-                } => {
+                Entry::Leaf { ppn, entry } => {
+                    let bit_u = entry & BIT_U != 0;
+                    let bit_r = entry & BIT_R != 0;
+                    let bit_w = entry & BIT_W != 0;
+                    let bit_x = entry & BIT_X != 0;
+
                     // compare permissions of the PTE with the access type
-                    // FIXME: Add support for SUM and MXR bit
-                    let allowed = matches!(
-                        (mode, read, write, exec),
+                    // FIXME: Add support for MXR bit
+                    let mut allowed = matches!(
+                        (mode, bit_r, bit_w, bit_x),
                         (AccessType::Read, true, _, _)
                             | (AccessType::Write, _, true, _)
                             | (AccessType::Fetch, _, _, true)
                     );
+
+                    // check if S-mode is permitted to access a U-page
+                    let sum = mstatus.get_bit(18);
+                    if bit_u
+                        && prv == PrivilegeMode::Supervisor
+                        && (mode == AccessType::Fetch || !sum)
+                    {
+                        allowed = false;
+                    }
+
+                    // check if U-mode tries to access without U-bit
+                    if bit_u && prv == PrivilegeMode::User {
+                        allowed = false;
+                    }
 
                     if !allowed {
                         return Err(error);
@@ -123,12 +137,7 @@ enum Entry {
     /// This entry points to the next page table level.
     Branch(Address),
     /// Translation was successful and the physical address was found.
-    Leaf {
-        ppn: Address,
-        read: bool,
-        write: bool,
-        exec: bool,
-    },
+    Leaf { ppn: Address, entry: u64 },
 }
 
 impl Entry {
@@ -148,12 +157,7 @@ impl Entry {
 
         // check if this PTE is a leaf
         if bit_r || bit_x {
-            return Some(Entry::Leaf {
-                ppn,
-                read: bit_r,
-                write: bit_w,
-                exec: bit_x,
-            });
+            return Some(Entry::Leaf { ppn, entry: x });
         }
 
         // this PTE is a branch to the next level
