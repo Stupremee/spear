@@ -283,10 +283,14 @@ impl crate::Instruction for Instruction {
                 return Ok(Continuation::Jump);
             }
             Instruction::SRET(_) => {
-                // trap when not in S-Mode, or we are in S-Mode and TSR=1
-                if cpu.mode() != PrivilegeMode::Supervisor
-                    || ext(cpu).force_read_csr(csr::MSTATUS).get_bit(22)
-                {
+                // get the required privilege mode for executing this instruction
+                let req_prv = if ext(cpu).force_read_csr(csr::MSTATUS).get_bit(22) {
+                    PrivilegeMode::Machine
+                } else {
+                    PrivilegeMode::Supervisor
+                };
+
+                if cpu.mode() < req_prv {
                     return Err(Exception::IllegalInstruction(0));
                 }
 

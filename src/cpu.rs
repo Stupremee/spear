@@ -9,6 +9,7 @@ use crate::{
     Address, Architecture, Continuation, Extension, Instruction, MemoryPod,
 };
 use log::trace;
+use std::cmp::Ordering;
 
 /// Different privilege modes a CPU core can be in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,15 +48,17 @@ impl PrivilegeMode {
             PrivilegeMode::Machine => 0b11,
         }
     }
+}
 
-    /// Check if this privilege mode has higher privileges than the given mode.
-    pub fn can_access(self, other: PrivilegeMode) -> bool {
-        use PrivilegeMode::*;
+impl PartialOrd for PrivilegeMode {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.to_bits().partial_cmp(&other.to_bits())
+    }
+}
 
-        matches!(
-            (self, other),
-            (Machine, _) | (Supervisor, Supervisor | User) | (User, User)
-        )
+impl Ord for PrivilegeMode {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.to_bits().cmp(&other.to_bits())
     }
 }
 

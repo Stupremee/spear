@@ -29,7 +29,7 @@ impl CsrAddress {
         // get the lowest privilege level that can access the CSR
         let x = (self.0 >> 8) & 0b11;
         let x = PrivilegeMode::from_bits(x as u8);
-        mode.can_access(x)
+        mode >= x
     }
 
     /// Check if this CSR can be written to from the given privilege mode.
@@ -42,7 +42,7 @@ impl CsrAddress {
         // get the lowest privilege level that can access the CSR
         let x = (self.0 >> 8) & 0b11;
         let x = PrivilegeMode::from_bits(x as u8);
-        mode.can_access(x)
+        mode >= x
     }
 }
 

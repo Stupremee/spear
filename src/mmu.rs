@@ -109,7 +109,7 @@ impl Mmu {
                     // FIXME: step 7, A and D bits
 
                     // calculate the physical address and return it
-                    return Ok(ppn + (addr & 0xFFFu32));
+                    return Ok(ppn + info.offset_of(addr, lvl));
                 }
             }
         }
@@ -186,8 +186,17 @@ impl PagingMode {
     /// Read a PTE from the given address.
     fn read_entry(&self, cpu: &Cpu, table: Address, vpn: u32) -> Result<Option<Entry>> {
         Ok(match self {
-            PagingMode::Sv32 => Entry::parse(cpu.read::<u32>(table + vpn * 4)? as u64),
+            PagingMode::Sv32 => Entry::parse(cpu.bus.read::<u32>(table + vpn * 4)? as u64),
         })
+    }
+
+    /// Get the pageoffset of a virtual address, at the given level.
+    fn offset_of(&self, addr: Address, lvl: usize) -> u32 {
+        match (self, lvl) {
+            (PagingMode::Sv32, 0) => u32::from(addr & 0x3FFu32),
+            (PagingMode::Sv32, 1) => u32::from(addr & 0x3FFFFFu32),
+            (PagingMode::Sv32, _) => unreachable!(),
+        }
     }
 }
 
