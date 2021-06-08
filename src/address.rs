@@ -176,6 +176,15 @@ impl From<Address> for u64 {
     }
 }
 
+impl From<Address> for u32 {
+    fn from(x: Address) -> Self {
+        match x.0 {
+            AddressKind::U32(x) => x,
+            AddressKind::U64(x) => x as u32,
+        }
+    }
+}
+
 /// Different representations of an address.
 #[derive(Debug, Clone, Copy)]
 pub enum SignedAddressKind {

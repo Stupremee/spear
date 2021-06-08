@@ -45,13 +45,11 @@ impl Mmu {
     /// Translate a physical address to a virtual address, by walking the page table found
     /// in the `xATP` register using the given access type.
     pub fn translate(&self, cpu: &Cpu, addr: Address, mode: AccessType) -> Result<Address> {
-        fn error_for_mode(addr: Address, mode: AccessType) -> Exception {
-            match mode {
-                AccessType::Read => Exception::LoadPageFault(addr),
-                AccessType::Write => Exception::StorePageFault(addr),
-                AccessType::Fetch => Exception::InstructionPageFault(addr),
-            }
-        }
+        let error = match mode {
+            AccessType::Read => Exception::LoadPageFault(addr),
+            AccessType::Write => Exception::StorePageFault(addr),
+            AccessType::Fetch => Exception::InstructionPageFault(addr),
+        };
 
         let csr = match cpu.arch.zicsr.as_ref() {
             Some(csr) => csr,
@@ -69,127 +67,142 @@ impl Mmu {
 
         // now walk the page tables to translate the address
         let satp = csr.force_read_csr(csr::SATP);
-        let info = match decode_satp(satp, prv, &cpu.arch) {
+        let (mut table, info) = match decode_satp(satp, prv, &cpu.arch) {
             Some(info) => info,
             None => return Ok(addr),
         };
 
-        let mut base = info.ptbase;
-        for lvl in (0..info.levels).rev() {
-            // get the bits to shift to get the current VPN
-            let ptshift = lvl * info.idxbits;
+        // loop through each level, starting from the highest level
+        for lvl in (0..info.levels()).rev() {
+            // get the VPN for the current level
+            let vpn = info.vpn(addr, lvl);
 
-            // get the virtual page number
-            let idx = (addr >> (PAGE_SHIFT + ptshift)) & ((1u64 << info.idxbits) - 1);
+            // read the PTE at the current VPN
+            let pte = info.read_entry(cpu, table, vpn)?.ok_or(error)?;
 
-            // read the PTE from the current page table
-            let pte = match info.ptesize {
-                4 => cpu
-                    .bus
-                    .read::<u32>(base + idx * info.ptesize)
-                    .map_err(|_| error_for_mode(addr, mode))? as u64,
-                _ => unreachable!(),
-            };
-
-            match Entry::from_raw(pte) {
-                // if this PTE points to the next table, update the base pointer
-                // and continue
-                Entry::Branch(next) => base = next,
-                // found an address to translate
-                Entry::Leaf(phys) => {
-                    // check if the PTE has the correct permissions
-                    // FIXME: `SUM` and `MXR`
-                    let valid = match mode {
-                        AccessType::Read => pte & BIT_R != 0,
-                        AccessType::Write => pte & BIT_W != 0,
-                        AccessType::Fetch => pte & BIT_X != 0,
+            match pte {
+                Entry::Branch(next) => {
+                    // go to the next page table level
+                    table = next;
+                    continue;
+                }
+                Entry::Leaf {
+                    ppn,
+                    read,
+                    write,
+                    exec,
+                } => {
+                    // compare permissions of the PTE with the access type
+                    // FIXME: Add support for SUM and MXR bit
+                    let allowed = match (mode, read, write, exec) {
+                        (AccessType::Read, true, _, _)
+                        | (AccessType::Write, _, true, _)
+                        | (AccessType::Fetch, _, _, true) => true,
+                        _ => false,
                     };
 
-                    return valid
-                        .then(|| {
-                            // add the offset inside the page and return the physical address
-                            let off = addr & 0xFFFu32;
-                            let virt = phys + off;
-                            log::trace!("translated {} to {}", virt, addr);
-                            virt
-                        })
-                        .ok_or_else(|| error_for_mode(addr, mode));
+                    if !allowed {
+                        return Err(error);
+                    }
+
+                    // FIXME: step 6, check if the last VPN is 0
+                    // FIXME: step 7, A and D bits
+
+                    // calculate the physical address and return it
+                    return Ok(ppn + (addr & 0xFFFu32));
                 }
-                // entry is invalid, throw exception
-                Entry::Invalid => break,
             }
         }
 
-        Err(error_for_mode(addr, mode))
+        Err(error)
     }
 }
 
 /// Representation of a page table entry.
-pub enum Entry {
+enum Entry {
     /// This entry points to the next page table level.
     Branch(Address),
     /// Translation was successful and the physical address was found.
-    Leaf(Address),
-    /// This is entry is not valid, thus should throw an exception.
-    Invalid,
+    Leaf {
+        ppn: Address,
+        read: bool,
+        write: bool,
+        exec: bool,
+    },
 }
 
 impl Entry {
-    /// Convert a raw PTE into a parsed version.
-    pub fn from_raw(x: u64) -> Entry {
-        if x & (BIT_V | BIT_R | BIT_W | BIT_X) == BIT_V {
-            Entry::Branch(Address::from(x >> PPN_SHIFT << PAGE_SHIFT))
-        } else if x & BIT_V == BIT_V {
-            Entry::Leaf(Address::from(x >> PPN_SHIFT << PAGE_SHIFT))
-        } else {
-            Entry::Invalid
+    /// Parse a raw PTE into a better representation.
+    pub fn parse(x: u64) -> Option<Entry> {
+        let bit_v = x & BIT_V != 0;
+        let bit_r = x & BIT_R != 0;
+        let bit_w = x & BIT_W != 0;
+        let bit_x = x & BIT_X != 0;
+
+        // check if this entry is valid
+        if !bit_v || (!bit_r && bit_w) {
+            return None;
         }
+
+        let ppn = Address::from(x) >> 10 << PAGE_SHIFT;
+
+        // check if this PTE is a leaf
+        if bit_r || bit_x {
+            return Some(Entry::Leaf {
+                ppn,
+                read: bit_r,
+                write: bit_w,
+                exec: bit_x,
+            });
+        }
+
+        // this PTE is a branch to the next level
+        Some(Entry::Branch(ppn))
     }
 }
 
-/// Structure for describing the currently enabled virtual memory mode.
-struct VirtualInfo {
-    levels: u32,
-    idxbits: u32,
-    widenbits: u32,
-    ptesize: u32,
-    ptbase: Address,
+/// Represents the different paging modes.
+enum PagingMode {
+    Sv32,
 }
 
-impl VirtualInfo {
-    fn new(levels: u32, idxbits: u32, widenbits: u32, ptesize: u32, ptbase: Address) -> Self {
-        Self {
-            levels,
-            idxbits,
-            widenbits,
-            ptesize,
-            ptbase,
+impl PagingMode {
+    /// Return the amount of page table levels this paging mode has.
+    const fn levels(&self) -> usize {
+        match self {
+            PagingMode::Sv32 => 2,
         }
+    }
+
+    /// Get the Virtual Page Number with the given index from the given virtual address
+    fn vpn(&self, addr: Address, idx: usize) -> u32 {
+        match (self, idx) {
+            (PagingMode::Sv32, 0) => (u32::from(addr) >> PAGE_SHIFT) & 0x3FF,
+            (PagingMode::Sv32, 1) => (u32::from(addr) >> PAGE_SHIFT >> 10) & 0x3FF,
+            (PagingMode::Sv32, _) => unreachable!(),
+        }
+    }
+
+    /// Read a PTE from the given address.
+    fn read_entry(&self, cpu: &Cpu, table: Address, vpn: u32) -> Result<Option<Entry>> {
+        Ok(match self {
+            PagingMode::Sv32 => Entry::parse(cpu.read::<u32>(table + vpn * 4)? as u64),
+        })
     }
 }
 
-fn decode_satp(satp: Address, prv: PrivilegeMode, arch: &Architecture) -> Option<VirtualInfo> {
-    const PPN32_MASK: u32 = 0x003FFFFF;
-
+fn decode_satp(
+    satp: Address,
+    prv: PrivilegeMode,
+    arch: &Architecture,
+) -> Option<(Address, PagingMode)> {
     match prv {
         PrivilegeMode::Machine => None,
         PrivilegeMode::Supervisor | PrivilegeMode::User if arch.xlen == 32 => {
-            // read the MODE bit from the satp
+            // read the MODE bit from the satp, and return Sv32 if it's 1
             let mode = u64::from(satp & (1u32 << 31));
-            match mode {
-                0 => None,
-                _ => Some(VirtualInfo::new(
-                    2,
-                    10,
-                    0,
-                    4,
-                    (satp & PPN32_MASK) << PAGE_SHIFT,
-                )),
-            }
+            (mode != 0).then(|| ((satp & 0x003FFFFFu32) << PAGE_SHIFT, PagingMode::Sv32))
         }
-        PrivilegeMode::Supervisor | PrivilegeMode::User if arch.xlen == 64 => {
-            todo!()
-        }
-        _ => unreachable!(),
+        _ => todo!(),
     }
 }
