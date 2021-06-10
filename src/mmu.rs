@@ -19,8 +19,8 @@ const BIT_W: u64 = 0x04;
 const BIT_X: u64 = 0x08;
 const BIT_U: u64 = 0x10;
 // const BIT_G: u64 = 0x20;
-// const BIT_A: u64 = 0x40;
-// const BIT_D: u64 = 0x80;
+const BIT_A: u64 = 0x40;
+const BIT_D: u64 = 0x80;
 
 /// Different access types that memory can be accessed for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,15 +91,22 @@ impl Mmu {
                     let bit_r = entry & BIT_R != 0;
                     let bit_w = entry & BIT_W != 0;
                     let bit_x = entry & BIT_X != 0;
+                    let bit_a = entry & BIT_A != 0;
+                    let bit_d = entry & BIT_D != 0;
+
+                    let mxr = mstatus.get_bit(19);
 
                     // compare permissions of the PTE with the access type
-                    // FIXME: Add support for MXR bit
-                    let mut allowed = matches!(
-                        (mode, bit_r, bit_w, bit_x),
-                        (AccessType::Read, true, _, _)
-                            | (AccessType::Write, _, true, _)
-                            | (AccessType::Fetch, _, _, true)
-                    );
+                    #[rustfmt::skip]
+                    let mut allowed = match (mode, bit_r as u8, bit_w as u8, bit_x as u8) {
+                        (AccessType::Read,    1, _, _)
+                        | (AccessType::Write, _, 1, _)
+                        | (AccessType::Fetch, _, _, 1) => true,
+
+                        // read is allowed if R=0, X=1 and MXR=1
+                        (AccessType::Read,    0, _, 1) if mxr => true,
+                        _ => false,
+                    };
 
                     // check if S-mode is permitted to access a U-page
                     let sum = mstatus.get_bit(18);
@@ -111,7 +118,12 @@ impl Mmu {
                     }
 
                     // check if U-mode tries to access without U-bit
-                    if bit_u && prv == PrivilegeMode::User {
+                    if prv == PrivilegeMode::User && !bit_u {
+                        allowed = false;
+                    }
+
+                    // If A=0, or if the memory access is a store and D=0 raise an exception
+                    if (bit_a || mode == AccessType::Write) && !bit_d {
                         allowed = false;
                     }
 
@@ -120,7 +132,6 @@ impl Mmu {
                     }
 
                     // FIXME: step 6, check if the last VPN is 0
-                    // FIXME: step 7, A and D bits
 
                     // calculate the physical address and return it
                     return Ok(ppn + info.offset_of(addr, lvl));
