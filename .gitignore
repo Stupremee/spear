@@ -5,6 +5,7 @@
 # Nix
 /result*
 /nix/result*
+.pre-commit-config.yaml
 
 # Direnv
 /.direnv

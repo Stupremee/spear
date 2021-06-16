@@ -141,6 +141,11 @@ impl Mmu {
 
         Err(error)
     }
+
+    /// Check if the access of `len` bytes at `addr` is valid according the the PMP.
+    fn check_pmp(addr: Address, len: usize, mode: AccessType, prv: PrivilegeMode) -> bool {
+        true
+    }
 }
 
 /// Representation of a page table entry.
