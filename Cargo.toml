@@ -3,18 +3,9 @@ name = "spear"
 license = "zlib"
 version = "0.1.0"
 authors = ["Justus K <justus.k@protonmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-bytemuck = "1.5"
-object = "0.25"
-log = "0.4"
-env_logger = "0.8"
-
-[dependencies.derive_more]
-version = "0.99"
-default-features = false
-features = ["display", "from", "into"]
 
 [package.metadata.nix]
 app = true
