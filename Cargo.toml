@@ -6,6 +6,8 @@ authors = ["Justus K <justus.k@protonmail.com>"]
 edition = "2021"
 
 [dependencies]
+bytemuck = "1.7.2"
+object = "0.26.2"
 
 [package.metadata.nix]
 app = true
